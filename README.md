@@ -1,6 +1,18 @@
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Mariachi de Uclatlán
+
+This is the official website for **Mariachi de Uclatlán**, UCLA's premier mariachi ensemble. The site is built with **React**, **Vite**, and features a clean modular layout with routing, reusable components, and custom styling.
+
+## 🚀 Features
+
+- Home, About, Members, and Contact pages
+- Responsive layout using custom CSS
+- Component-based structure (`Navbar`, `Footer`)
+- Built with Vite for fast development
+
+## 📁 Project Structure
 
 Currently, two official plugins are available:
 
