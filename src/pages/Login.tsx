@@ -1,18 +1,22 @@
+
 // src/pages/Login.tsx
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      alert('Logged in successfully!');
+      navigate('/MembersOnly');
     } catch (err: any) {
       setError(err.message);
     }

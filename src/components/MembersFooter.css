@@ -1,0 +1,12 @@
+
+.member-footer {
+  background-color: #FFD100;
+  color: #000;
+  text-align: center;
+  padding: 1rem;
+  font-family: 'Helvetica Neue', sans-serif;
+  font-size: 0.9rem;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
