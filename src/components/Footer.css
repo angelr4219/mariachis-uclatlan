@@ -1,0 +1,11 @@
+.footer {
+    text-align: center;
+    padding: 1rem;
+    background-color: #FFD100; /* UCLA Gold */
+    color: #000;
+    font-family: 'Helvetica Neue', sans-serif;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    font-size: 0.9rem;
+  }

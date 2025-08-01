@@ -1,0 +1,32 @@
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #2774AE; /* UCLA Blue */
+    color: white;
+    padding: 1rem 2rem;
+    font-family: 'Helvetica Neue', sans-serif;
+  }
+  
+  .nav-brand {
+    font-size: 1.75rem;
+    font-weight: 700;
+  }
+  
+  .nav-links {
+    list-style: none;
+    display: flex;
+    gap: 1.5rem;
+  }
+  
+  .nav-links li a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 1rem;
+  }
+  
+  .nav-links li a:hover {
+    text-decoration: underline;
+  }
+  
