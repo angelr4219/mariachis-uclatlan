@@ -33,7 +33,7 @@ const RegisterForm: React.FC = () => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
       await setDoc(doc(db, 'users', userCredential.user.uid), form);
-      navigate('/members');
+      navigate('/membersOnly');
     } catch (err: any) {
       setError(err.message);
     }
