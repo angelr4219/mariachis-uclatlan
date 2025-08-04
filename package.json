@@ -4,11 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
+  "dev": "vite",
+  "build": "tsc -b && vite build",
+  "lint": "eslint .",
+  "preview": "vite preview",
+  "predeploy": "vite build",
+  "deploy": "gh-pages -d dist"
+},
   "dependencies": {
     "firebase": "^12.0.0",
     "react": "^19.1.0",
@@ -32,4 +34,5 @@
     "typescript-eslint": "^8.35.1",
     "vite": "^7.0.4"
   }
+  
 }
