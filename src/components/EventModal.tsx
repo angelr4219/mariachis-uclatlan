@@ -1,7 +1,18 @@
 import React from 'react';
 import './EventModal.css'; // Style your modal here
 
-const EventModal = ({ event, onClose }) => {
+interface EventModalProps {
+  event: {
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    description: string;
+  };
+  onClose: () => void;
+}
+
+const EventModal: React.FC<EventModalProps> = ({ event, onClose }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>

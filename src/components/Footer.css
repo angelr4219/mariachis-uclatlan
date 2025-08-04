@@ -1,12 +1,20 @@
-.footer {
-    text-align: center;
-    padding: 1rem;
-    background-color: #2774AE;
-    /*background-color: #FFD100; /* UCLA Gold */
-    color: #FFFFFF;
-    font-family: 'Helvetica Neue', sans-serif;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    font-size: 0.9rem;
-  }
+.footer.compact-footer {
+  background-color: #1e1e1e;
+  color: #ccc;
+  padding: 0.5rem 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.footer.compact-footer a {
+  color: #ffcc00;
+  text-decoration: none;
+}
+
+.footer.compact-footer a:hover {
+  text-decoration: underline;
+}
+
+.footer.compact-footer p {
+  margin: 0.2rem 0;
+}

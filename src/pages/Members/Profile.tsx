@@ -1,50 +1,51 @@
-
-// src/pages/MembersProfile.tsx
 import React, { useEffect, useState } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import UserProfile from '../../components/UserProfile'; // Import your component here
 
-const MembersProfile: React.FC = () => {
-  const [userData, setUserData] = useState<any>(null);
+interface UserData {
+  name: string;
+  email: string;
+  phoneNumber: string;
+  year: string;
+  major: string;
+  instrument: string;
+  returning: string;
+  ownsInstrument: string;
+  readsMusic: string;
+  notes: string;
+  role: string;
+}
+
+const ProfilePage: React.FC = () => {
+  const [user] = useAuthState(auth);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      const user = auth.currentUser;
-      console.log("Logged-in user:", user); 
-  
-      if (user) {
-        const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          console.log("Profile data:", docSnap.data()); 
-          setUserData(docSnap.data());
-        } else {
-          console.log("No document found for user.");
-        }
-      } else {
-        console.log("No user is currently logged in.");
+    const fetchUserData = async () => {
+      if (!user) return;
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setUserData(docSnap.data() as UserData);
       }
+      setLoading(false);
     };
-    fetchProfile();
-  }, []);
-  
 
-  if (!userData) {
-    return <p className="ucla-paragraph">Loading profile...</p>;
-  }
+    fetchUserData();
+  }, [user]);
+
+  if (loading) return <p>Loading profile...</p>;
+  if (!userData) return <p>No profile data found.</p>;
 
   return (
     <section className="ucla-content">
       <h1 className="ucla-heading-xl">Your Profile</h1>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {Object.entries(userData).map(([key, value]) => (
-          <li key={key} style={{ marginBottom: '0.5rem' }}>
-            <strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</strong> {String(value)}
-          </li>
-        ))}
-      </ul>
+      <UserProfile userData={userData} />
     </section>
   );
 };
 
-export default MembersProfile;
+export default ProfilePage;

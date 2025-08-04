@@ -1,4 +1,3 @@
-
 // src/pages/Register.tsx
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -8,15 +7,15 @@ import { doc, setDoc } from 'firebase/firestore';
 
 const RegisterForm: React.FC = () => {
   const [form, setForm] = useState({
-    fullName: '',
+    name: '',
     email: '',
-    phone: '',
+    phoneNumber: '',
     year: '',
     major: '',
     instrument: '',
     returning: '',
-    readsMusic: '',
     ownsInstrument: '',
+    readsMusic: '',
     notes: '',
     password: ''
   });
@@ -32,7 +31,24 @@ const RegisterForm: React.FC = () => {
     e.preventDefault();
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
-      await setDoc(doc(db, 'users', userCredential.user.uid), form);
+      const user = userCredential.user;
+
+      // Prepare Firestore profile data
+      const userData = {
+        name: form.name,
+        email: form.email,
+        phoneNumber: form.phoneNumber,
+        year: form.year,
+        major: form.major,
+        instrument: form.instrument,
+        returning: form.returning,
+        ownsInstrument: form.ownsInstrument,
+        readsMusic: form.readsMusic,
+        notes: form.notes,
+        role: 'performer' // Default role
+      };
+
+      await setDoc(doc(db, 'users', user.uid), userData);
       navigate('/membersOnly');
     } catch (err: any) {
       setError(err.message);
@@ -43,9 +59,11 @@ const RegisterForm: React.FC = () => {
     <section className="ucla-content">
       <h1 className="ucla-heading-xl">Register</h1>
       <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
-        {['fullName', 'email', 'phone', 'major', 'instrument', 'password'].map((field) => (
+        {['name', 'email', 'phoneNumber', 'major', 'instrument', 'password'].map((field) => (
           <div key={field} style={{ marginBottom: '1rem' }}>
-            <label htmlFor={field} style={{ display: 'block', fontWeight: 600 }}>{field.charAt(0).toUpperCase() + field.slice(1)}:</label>
+            <label htmlFor={field} style={{ display: 'block', fontWeight: 600 }}>
+              {field === 'phoneNumber' ? 'Phone Number' : field.charAt(0).toUpperCase() + field.slice(1)}:
+            </label>
             <input
               type={field === 'password' ? 'password' : 'text'}
               id={field}
@@ -61,16 +79,18 @@ const RegisterForm: React.FC = () => {
           <label htmlFor="year" style={{ display: 'block', fontWeight: 600 }}>Year in School:</label>
           <select name="year" id="year" value={form.year} onChange={handleChange} required style={{ width: '100%', padding: '0.5rem' }}>
             <option value="">Select Year</option>
-            <option>1st</option>
-            <option>2nd</option>
-            <option>3rd</option>
-            <option>4th</option>
+            <option>1st Year</option>
+            <option>2nd Year</option>
+            <option>3rd Year</option>
+            <option>4th Year</option>
             <option>Graduate</option>
           </select>
         </div>
         {['returning', 'readsMusic', 'ownsInstrument'].map((field) => (
           <div key={field} style={{ marginBottom: '1rem' }}>
-            <label htmlFor={field} style={{ display: 'block', fontWeight: 600 }}>{field === 'readsMusic' ? 'Do you read sheet music?' : field === 'ownsInstrument' ? 'Do you own your instrument?' : 'Are you a returning member?'}</label>
+            <label htmlFor={field} style={{ display: 'block', fontWeight: 600 }}>
+              {field === 'readsMusic' ? 'Do you read sheet music?' : field === 'ownsInstrument' ? 'Do you own your instrument?' : 'Are you a returning member?'}
+            </label>
             <select name={field} id={field} value={(form as any)[field]} onChange={handleChange} required style={{ width: '100%', padding: '0.5rem' }}>
               <option value="">Select</option>
               <option value="Yes">Yes</option>
