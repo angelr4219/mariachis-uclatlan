@@ -10,9 +10,7 @@ const Footer: React.FC = () => {
         <p>
           Designed and developed by <strong>Angel Ramirez</strong>, member of Mariachi de Uclatlán and web developer passionate about preserving Mexican musical heritage.
         </p>
-        <p>
-          Mariachi de Uclatlán is UCLA's premier mariachi ensemble, dedicated to promoting and celebrating the rich traditions of Mexican music and culture through performances, educational outreach, and community engagement.
-        </p>
+        
         <p>
           Follow us on:
           <a href="https://www.facebook.com/Uclatlan" target="_blank" rel="noopener noreferrer"> Facebook</a> | 

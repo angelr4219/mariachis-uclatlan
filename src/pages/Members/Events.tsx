@@ -1,41 +1,48 @@
-// src/pages/MembersEvents.tsx
-import React from 'react';
-import CalendarApp from '../../components/CalendarApp';
-import '../../components/CalendarApp.css';
+import React, { useState } from 'react';
+import Navbar from '../../components/Navbar';
+import EventCard from '..//../components/EventCard';
+import EventModal from '../../components/EventModal';
+import './Events.css'; 
 
-const MembersEvents: React.FC = () => {
+const eventsData = [
+  {
+    id: 1,
+    title: 'Spring Recital',
+    date: '2025-05-10',
+    time: '7:00 PM',
+    location: 'Royce Hall, UCLA',
+    description: 'Join us for our annual spring recital showcasing traditional mariachi music!'
+  },
+  {
+    id: 2,
+    title: 'Community Festival Performance',
+    date: '2025-06-05',
+    time: '2:00 PM',
+    location: 'Olvera Street, Los Angeles',
+    description: 'Celebrate with us at Olvera Street with live mariachi music and cultural festivities.'
+  }
+  // Add more events here
+];
+
+const Events = () => {
+  const [selectedEvent, setSelectedEvent] = useState(null);
+
   return (
-    <section
-      className="ucla-content"
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        gap: '2rem',
-        flexWrap: 'wrap',
-        fontFamily: 'Helvetica, Arial, sans-serif',
-        color: '#2774AE', // UCLA Blue
-        backgroundColor: '#F5F5F5',
-        padding: '2rem',
-        borderRadius: '1rem'
-      }}
-    >
-      <div style={{ flex: '1 1 350px', maxWidth: '420px' }}>
-        <h1
-          className="ucla-heading-xl"
-          style={{ color: '#FFD100', fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '1px' }} // UCLA Gold
-        >
-          Event Calendar
-        </h1>
-        <p className="ucla-paragraph" style={{ color: '#333', fontSize: '1.1rem', lineHeight: '1.5' }}>
-          Click a future date to add a rehearsal or performance event.
-        </p>
+    <div>
+      
+      <div className="events-page">
+        <h1>Upcoming Performances</h1>
+        <div className="events-grid">
+          {eventsData.map(event => (
+            <EventCard key={event.id} event={event} onClick={() => setSelectedEvent(event)} />
+          ))}
+        </div>
+        {selectedEvent && (
+          <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        )}
       </div>
-      <div style={{ flex: '1 1 800px', minWidth: '500px' }}>
-        <CalendarApp />
-      </div>
-    </section>
+    </div>
   );
 };
 
-export default MembersEvents;
+export default Events;
