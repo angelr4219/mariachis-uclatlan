@@ -14,9 +14,7 @@ const RegisterForm: React.FC = () => {
     major: '',
     instrument: '',
     returning: '',
-    ownsInstrument: '',
-    readsMusic: '',
-    notes: '',
+
     password: ''
   });
   const [error, setError] = useState('');
@@ -42,9 +40,6 @@ const RegisterForm: React.FC = () => {
         major: form.major,
         instrument: form.instrument,
         returning: form.returning,
-        ownsInstrument: form.ownsInstrument,
-        readsMusic: form.readsMusic,
-        notes: form.notes,
         role: 'performer' // Default role
       };
 
@@ -86,10 +81,10 @@ const RegisterForm: React.FC = () => {
             <option>Graduate</option>
           </select>
         </div>
-        {['returning', 'readsMusic', 'ownsInstrument'].map((field) => (
+        {['returning'].map((field) => (
           <div key={field} style={{ marginBottom: '1rem' }}>
             <label htmlFor={field} style={{ display: 'block', fontWeight: 600 }}>
-              {field === 'readsMusic' ? 'Do you read sheet music?' : field === 'ownsInstrument' ? 'Do you own your instrument?' : 'Are you a returning member?'}
+              { 'Are you a returning member?'}
             </label>
             <select name={field} id={field} value={(form as any)[field]} onChange={handleChange} required style={{ width: '100%', padding: '0.5rem' }}>
               <option value="">Select</option>
@@ -98,17 +93,7 @@ const RegisterForm: React.FC = () => {
             </select>
           </div>
         ))}
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="notes" style={{ display: 'block', fontWeight: 600 }}>Other info / schedule conflicts:</label>
-          <textarea
-            name="notes"
-            id="notes"
-            value={form.notes}
-            onChange={handleChange}
-            rows={4}
-            style={{ width: '100%', padding: '0.5rem' }}
-          ></textarea>
-        </div>
+        
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <button type="submit" style={{ padding: '0.75rem 1.5rem', fontSize: '1rem', backgroundColor: '#2774AE', color: 'white', border: 'none', borderRadius: '4px' }}>
           Register
