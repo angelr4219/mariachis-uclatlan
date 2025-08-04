@@ -20,6 +20,7 @@ import { onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
 import { auth } from './firebase';
 import PerformerAvailability from './pages/Members/PerformerAvailability';
 import Events from './pages/Members/Events';
+import ManageMembersPage from './pages/ManageMembers';
 
 const App: React.FC = () => {
   const [user, setUser] = React.useState<any>(null);
@@ -56,10 +57,12 @@ const App: React.FC = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="src/pages/AdminDashboard.tsx" element={user && claims?.admin ? <AdminDashboard /> : <Navigate to="/login" replace />} />
-          <Route path="src/pages/AdminDashboard.tsx" element={user && claims?.admin ? <AdminDashboard /> : <Navigate to="/login" replace />} />
+          <Route path="src/pages/AdminDashboard.tsx" element={user? <AdminDashboard /> : <Navigate to="/login" replace />} />
+          <Route path="src/pages/AdminDashboard.tsx" element={user  ? <AdminDashboard /> : <Navigate to="/login" replace />} />
           <Route path="src/pages/Members/PerformerAvailability.tsx" element={user ? <PerformerAvailability /> : <Navigate to="/login" replace />} />
           <Route path="/members/events" element={user ? <Events /> : <Navigate to="/login" replace />} />
+          <Route path="/members/manage" element={<ManageMembersPage />} />
+
               
         </Routes>
       </main>

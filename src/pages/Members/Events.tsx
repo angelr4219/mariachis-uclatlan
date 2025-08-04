@@ -29,7 +29,7 @@ const eventsData: EventType[] = [
     time: '2:00 PM',
     location: 'Olvera Street, Los Angeles',
     description: 'Celebrate with us at Olvera Street with live mariachi music and cultural festivities.'
-  }
+  },
   {
     id: 3,
     title: 'test',
