@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
-import Navbar from '../../components/Navbar';
-import EventCard from '..//../components/EventCard';
+// src/pages/Members/Events.tsx
+import { useState } from 'react';
+import EventCard from '../../components/EventCard';
 import EventModal from '../../components/EventModal';
-import './Events.css'; 
+import './Events.css';
 
-const eventsData = [
+interface EventType {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  description: string;
+}
+
+const eventsData: EventType[] = [
   {
     id: 1,
     title: 'Spring Recital',
@@ -21,26 +30,31 @@ const eventsData = [
     location: 'Olvera Street, Los Angeles',
     description: 'Celebrate with us at Olvera Street with live mariachi music and cultural festivities.'
   }
+  {
+    id: 3,
+    title: 'test',
+    date: '2025-06-05',
+    time: '3:00 PM',
+    location: 'Olvera Street, Los Angeles',
+    description: 'Celebrate with us at Olvera Street with live mariachi music and cultural festivities.'
+  }
   // Add more events here
 ];
 
 const Events = () => {
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null);
 
   return (
-    <div>
-      
-      <div className="events-page">
-        <h1>Upcoming Performances</h1>
-        <div className="events-grid">
-          {eventsData.map(event => (
-            <EventCard key={event.id} event={event} onClick={() => setSelectedEvent(event)} />
-          ))}
-        </div>
-        {selectedEvent && (
-          <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
-        )}
+    <div className="events-page">
+      <h1>Upcoming Performances</h1>
+      <div className="events-grid">
+        {eventsData.map(event => (
+          <EventCard key={event.id} event={event} onClick={() => setSelectedEvent(event)} />
+        ))}
       </div>
+      {selectedEvent && (
+        <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      )}
     </div>
   );
 };

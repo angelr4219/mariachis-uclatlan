@@ -3,6 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import './MembersNavbar.css';
 
+
 const MemberNavbar: React.FC = () => {
   return (
     <nav className="member-navbar">
@@ -11,8 +12,10 @@ const MemberNavbar: React.FC = () => {
         <li><Link to="/members">Dashboard</Link></li>
         <li><Link to="/members/profile">Profile</Link></li>
         <li><Link to="/members/events">Events</Link></li>
+        <li><Link to="src/pages/Members/PerformerAvailability.tsx">Availability</Link></li> {/* Added Availability */}
         <li><Link to="/members/resources">Resources</Link></li>
         <li><Link to="/members/settings">Settings</Link></li>
+        <li><Link to="src/pages/Members/EventAdminPanel.tsx">Admin Panel</Link></li> {/* Added Admin Panel */}
         <li><Link to="/">Public Site</Link></li>
       </ul>
     </nav>

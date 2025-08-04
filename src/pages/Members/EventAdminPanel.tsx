@@ -1,6 +1,8 @@
-import React, { useState, useEffect, ChangeEvent } from 'react';
+import React, { useState, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
+import type { DocumentData } from 'firebase/firestore'; // <-- ADD THIS LINE
 import { db } from '../../firebase';
-import { collection, doc, getDocs, setDoc, DocumentData } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc} from 'firebase/firestore';
 
 // Interfaces
 interface EventData {

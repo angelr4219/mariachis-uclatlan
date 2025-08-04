@@ -1,7 +1,9 @@
-import React, { useState, useEffect, ChangeEvent } from 'react';
-import { db, auth } from '../firebase';
-import { collection, doc, setDoc, getDocs, DocumentData } from 'firebase/firestore';
+// File: src/pages/Members/PerformerAvailability.tsx
+import React, { useState, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
+import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { db, auth } from '../../firebase';
 
 interface EventData {
   id: string;
@@ -17,10 +19,10 @@ const PerformerAvailability: React.FC = () => {
 
   useEffect(() => {
     const fetchEvents = async () => {
-      const querySnapshot = await getDocs(collection(db, "events"));
-      const eventsData = querySnapshot.docs.map(docSnap => ({
+      const querySnapshot = await getDocs(collection(db, 'events'));
+      const eventsData = querySnapshot.docs.map((docSnap) => ({
         id: docSnap.id,
-        ...docSnap.data()
+        ...docSnap.data(),
       })) as EventData[];
       setEvents(eventsData);
     };
@@ -28,39 +30,36 @@ const PerformerAvailability: React.FC = () => {
     fetchEvents();
   }, []);
 
-  const handleAvailabilityChange = (eventId: string, status: string) => {
-    setAvailability(prev => ({ ...prev, [eventId]: status }));
+  const handleAvailabilityChange = (eventId: string, e: ChangeEvent<HTMLSelectElement>) => {
+    setAvailability({ ...availability, [eventId]: e.target.value });
   };
 
   const handleSubmit = async (eventId: string) => {
     if (!user) return;
-    const availabilityDocRef = doc(db, `events/${eventId}/availabilities/${user.uid}`);
-    await setDoc(availabilityDocRef, {
-      name: user.displayName || user.email,
-      status: availability[eventId] || "maybe"
+
+    const participationRef = doc(db, `events/${eventId}/participation/${user.uid}`);
+    await setDoc(participationRef, {
+      availability: availability[eventId] || 'Unavailable',
+      updatedAt: new Date().toISOString(),
     });
     alert('Availability updated!');
   };
 
-  if (!user) {
-    return <p>Please log in to submit your availability.</p>;
-  }
-
   return (
     <div>
-      <h2>Your Availability</h2>
-      {events.map(event => (
-        <div key={event.id} style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem' }}>
+      <h1>Set Your Availability</h1>
+      {events.map((event) => (
+        <div key={event.id}>
           <h3>{event.title}</h3>
-          <p>{event.date} at {event.location}</p>
+          <p>{event.date} — {event.location}</p>
           <select
             value={availability[event.id] || ''}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => handleAvailabilityChange(event.id, e.target.value)}
+            onChange={(e) => handleAvailabilityChange(event.id, e)}
           >
             <option value="">Select Availability</option>
-            <option value="available">Available</option>
-            <option value="unavailable">Unavailable</option>
-            <option value="maybe">Maybe</option>
+            <option value="Available">Available</option>
+            <option value="Unavailable">Unavailable</option>
+            <option value="Maybe">Maybe</option>
           </select>
           <button onClick={() => handleSubmit(event.id)}>Submit</button>
         </div>
