@@ -5,7 +5,7 @@ This template provides a minimal setup to get React working in Vite with HMR and
 
 This is the official website for **Mariachi de Uclatlán**, UCLA's premier mariachi ensemble. The site is built with **React**, **Vite**, and features a clean modular layout with routing, reusable components, and custom styling.
 
-## 🚀 Features
+## Features
 
 - Home, About, Members, and Contact pages
 - Responsive layout using custom CSS
