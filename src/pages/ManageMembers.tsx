@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, doc, updateDoc } from 'firebase/firestore';
+import './ManageMembers.css';
 
 interface UserData {
   id?: string;
@@ -23,16 +24,20 @@ const ManageMembersPage: React.FC = () => {
     role: 'performer',
   });
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      const querySnapshot = await getDocs(collection(db, 'users'));
-      const usersData = querySnapshot.docs.map(docSnap => ({
+  const fetchUsers = async () => {
+    const querySnapshot = await getDocs(collection(db, 'users'));
+    const usersData = querySnapshot.docs.map(docSnap => {
+      const data = docSnap.data() as { user: UserData };
+      return {
         id: docSnap.id,
-        ...docSnap.data()
-      })) as UserData[];
-      setUsers(usersData);
-    };
+        ...data.user
+      };
+    });
+    console.log(usersData);
+    setUsers(usersData);
+  };
 
+  useEffect(() => {
     fetchUsers();
   }, []);
 
@@ -43,23 +48,23 @@ const ManageMembersPage: React.FC = () => {
 
   const handleAddUser = async () => {
     if (!newUser.name || !newUser.email) return alert('Name and Email are required.');
-    await addDoc(collection(db, 'users'), newUser);
+    await addDoc(collection(db, 'users'), { user: newUser });
     setNewUser({ name: '', email: '', instrument: '', schoolYear: '', section: '', role: 'performer' });
-    window.location.reload(); // Simple Refresh
+    fetchUsers(); // Re-fetch the list dynamically
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    await updateDoc(doc(db, 'users', userId), { role: newRole });
+    await updateDoc(doc(db, 'users', userId), { 'user.role': newRole });
     window.location.reload();
   };
 
   return (
-    <section style={{ padding: '2rem' }}>
+    <section className="manage-members-container">
       <h1>Manage Members</h1>
 
-      <div style={{ marginBottom: '2rem' }}>
+      <div className="add-member-section">
         <h2>Add New Member</h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="add-member-form">
           <input name="name" placeholder="Full Name" value={newUser.name} onChange={handleInputChange} />
           <input name="email" placeholder="Email" value={newUser.email} onChange={handleInputChange} />
           <input name="instrument" placeholder="Instrument" value={newUser.instrument} onChange={handleInputChange} />
@@ -74,20 +79,26 @@ const ManageMembersPage: React.FC = () => {
       </div>
 
       <h2>All Members</h2>
-      {users.map(user => (
-        <div key={user.id} style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem' }}>
-          <p><strong>{user.name}</strong> ({user.email})</p>
-          <p>Instrument: {user.instrument} | Section: {user.section} | Year: {user.schoolYear}</p>
-          <p>Current Role: {user.role}</p>
-          <select
-            value={user.role}
-            onChange={(e) => handleRoleChange(user.id!, e.target.value)}
-          >
-            <option value="performer">Performer</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-      ))}
+      <div className="members-list">
+        {users.map(user => (
+          <div key={user.id} className="member-card">
+            <div className="member-info">
+              <p><strong>{user.name}</strong> ({user.email})</p>
+              <p>Instrument: {user.instrument} | Section: {user.section} | Year: {user.schoolYear}</p>
+              <p>Current Role: {user.role}</p>
+            </div>
+            <div className="member-actions">
+              <select
+                value={user.role}
+                onChange={(e) => handleRoleChange(user.id!, e.target.value)}
+              >
+                <option value="performer">Performer</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 };

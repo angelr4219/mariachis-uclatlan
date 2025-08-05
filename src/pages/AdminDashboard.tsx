@@ -2,16 +2,16 @@ import React from 'react';
 import RoleAssigner from '../components/RoleAssigner';
 import ManageEvents from '../components/ManageEvents'; // Adjusted path
 import MembersList from '../components/MembersList'; // Adjusted path
-//import { useUserProfile } from '../context/UserProfileContext'; // Ensure this path is correct
+import { useUserProfile } from '../context/UserProfileContext'; // Ensure this path is correct
 
 const AdminDashBoard: React.FC = () => {
-    /*
   const { profile } = useUserProfile();
+  
 
   if (profile?.role !== 'admin') {
     return <p>You do not have permission to access the Admin Dashboard.</p>;
   }
-*/
+
   return (
     <section className="admin-dashboard" style={{ padding: '2rem' }}>
       <h1 style={{ marginBottom: '2rem' }}>Admin Dashboard</h1>
