@@ -14,7 +14,6 @@ const RegisterForm: React.FC = () => {
     major: '',
     instrument: '',
     returning: '',
-
     password: ''
   });
   const [error, setError] = useState('');

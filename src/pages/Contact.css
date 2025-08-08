@@ -1,0 +1,40 @@
+/* src/pages/Contact.css */
+.contact-page {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: black;           /* text is now black */
+}
+  
+.contact-intro {
+    margin: 0 auto 1.5rem;
+    line-height: 1.6;
+}
+  
+.contact-link {
+    text-decoration: underline;
+}
+  
+.contact-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+  
+.cta-button {
+    display: inline-block;
+    padding: 0.9rem 1.2rem;
+    border-radius: 0.75rem;
+    text-decoration: none;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.05);  /* lighter background for contrast */
+    color: black;                     /* button text also black */
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+  
+.cta-button:hover {
+    transform: translateY(-2px);
+    background: rgba(0, 0, 0, 0.15);
+}

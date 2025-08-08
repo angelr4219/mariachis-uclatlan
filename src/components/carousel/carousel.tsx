@@ -1,31 +1,22 @@
-import React, { useState } from 'react';
-import './Carousel.css'; // Style it
+// src/components/carousel/carousel.tsx
+import { useState } from 'react';
+import './Carousel.css';
 
-const images = [
-  '/images/performance1.jpg',
-  '/images/performance2.jpg',
-  '/images/rehearsal.jpg',
-  '/images/danza.jpg'
-];
+import img1 from '../../assets/IMG_1055.jpg';
+import img2 from '../../assets/inauguration.jpg';  // check the actual name
+import img3 from '../../assets/juliofrenk.jpg';
+     // <-- this one
+// import img5 from '../../assets/mdu-logo.png';    // if you’re using it
 
-const Carousel: React.FC = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+const images = [img1, img2, img3];
 
-  const nextSlide = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
-  };
-
-  const prevSlide = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
-  };
-
+export default function Carousel() {
+  const [i, setI] = useState(0);
   return (
     <div className="carousel">
-      <button className="carousel-button prev" onClick={prevSlide}>‹</button>
-      <img src={images[currentIndex]} alt={`Slide ${currentIndex + 1}`} className="carousel-image" />
-      <button className="carousel-button next" onClick={nextSlide}>›</button>
+      <button className="carousel-button prev" onClick={() => setI((i - 1 + images.length) % images.length)}>‹</button>
+      <img className="carousel-image" src={images[i]} alt={`Slide ${i + 1}`} />
+      <button className="carousel-button next" onClick={() => setI((i + 1) % images.length)}>›</button>
     </div>
   );
-};
-
-export default Carousel;
+}

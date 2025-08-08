@@ -1,0 +1,21 @@
+/* src/pages/About.css */
+.about-page {
+    text-align: center;
+    padding: 2rem;
+    max-width: 900px;           /* a bit wider for breathing room */
+    margin: 2rem auto;          /* centers the content */
+    color: white;               /* match the main site's text color */
+  }
+  
+  .about-page h1 {
+    color: black               /* same as main site header color */
+  }
+  .about-page p {
+    color: black               /* same as main site header color */
+  }
+  
+  .about-page h2 {
+    margin-top: 2rem;
+    color: #ffcc00;              /* highlight subheadings like a UCLA gold accent */
+  }
+  
