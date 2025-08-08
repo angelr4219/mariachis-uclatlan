@@ -19,10 +19,16 @@ import Footer from './components/Footer';
 import MembersNavbar from './components/MembersNavbar';
 import AdminNavbar from './adminComponents/adminNavbar.tsx'; // Adjust path if needed
 import PerformerNavbar from './performerComponents/performerNavbar.tsx';  // Adjust path if needed
+import Calendar from './pages/Members/Calendar';
+
 
 import RoleBasedLayout from './rolebasedlayout/rbl'; // Adjust import path as needed
 import { onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
 import { auth } from './firebase';
+
+import BookUs from './pages/bookUs';
+import Join from './pages/joinUs';
+
 
 const App: React.FC = () => {
   const [user, setUser] = React.useState<any>(null);
@@ -70,6 +76,8 @@ return (
           <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/book-us" element={<BookUs />} />
+          <Route path="/join" element={<Join />} />
 
           {/* Members Section */}
           <Route path="/members" element={user ? <MembersOnly /> : <Navigate to="/login" replace />} />
@@ -79,7 +87,7 @@ return (
           <Route path="/members/settings" element={user ? <MembersSettings /> : <Navigate to="/login" replace />} />
           <Route path="/members/performer-availability" element={user ? <PerformerAvailability /> : <Navigate to="/login" replace />} />
           <Route path="/members/manage" element={user ? <ManageMembersPage /> : <Navigate to="/login" replace />} />
-
+          <Route path="/members/calendar" element={<Calendar />} />
           {/* Role-Based Layout (Admin/Performer/Public Dashboards) */}
           <Route path="/dashboard" element={
             <RoleBasedLayout
