@@ -81,7 +81,11 @@ return (
 
           {/* Members Section */}
           <Route path="/members" element={user ? <MembersOnly /> : <Navigate to="/login" replace />} />
-          <Route path="/members/profile" element={user ? <MembersProfile /> : <Navigate to="/login" replace />} />
+          <Route
+          path="/members/profile"
+          element={user ? <MembersProfile /> : <Navigate to="/login" replace />}
+        />
+
           <Route path="/members/events" element={user ? <MembersEvents /> : <Navigate to="/login" replace />} />
           <Route path="/members/resources" element={user ? <MembersResources /> : <Navigate to="/login" replace />} />
           <Route path="/members/settings" element={user ? <MembersSettings /> : <Navigate to="/login" replace />} />

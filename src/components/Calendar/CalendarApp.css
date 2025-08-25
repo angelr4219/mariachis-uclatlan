@@ -1,0 +1,17 @@
+.cal-wrap { border: 1px solid #e5e5e5; border-radius: 10px; overflow: hidden; background: #fff; }
+.cal-header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid #eee; }
+.cal-title { font-weight: 700; }
+.cal-nav { background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-weekdays { background: #fafafa; border-bottom: 1px solid #eee; }
+.cal-weekday { padding: 0.5rem; text-align: center; font-weight: 600; color: #666; }
+.cal-cell { min-height: 110px; border-right: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; padding: 0.35rem; }
+.cal-cell:nth-child(7n) { border-right: none; }
+.cal-date { font-size: 0.9rem; font-weight: 700; color: #555; }
+.cal-date.today { color: #2774AE; }
+.muted { background: #fcfcfc; }
+.cal-events { margin-top: 0.35rem; display: flex; flex-direction: column; gap: 4px; }
+.cal-pill { text-align: left; border: none; border-radius: 999px; padding: 0.25rem 0.5rem; background: #eaf3fb; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-more { font-size: 0.8rem; color: #666; margin-top: 2px; }
+@media (max-width: 640px) { .cal-cell { min-height: 90px; } }
+

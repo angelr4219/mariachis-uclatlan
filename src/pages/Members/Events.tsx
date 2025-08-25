@@ -1,62 +1,62 @@
-// src/pages/Members/Events.tsx
-import { useState } from 'react';
-import EventCard from '../../components/EventCard';
-import EventModal from '../../components/EventModal';
-import './Events.css';
+// =====================================================================
+// 8) PAGE — src/pages/Members/Events.tsx (final, fixed paths & types)
+// =====================================================================
+import React from 'react';
+import EventCard from '../../components/events/EventCard';
+import type { EventType as EventCardType } from '../../components/events/EventCard';
+import EventModal from '../../components/events/EventModal';
+import { observeEvents } from '../../services/events';
+import type { EventItem } from '../../types/events';
+import { formatDateRange } from '../../utils/events';
 
-interface EventType {
-  id: number;
-  title: string;
-  date: string;
-  time: string;
-  location: string;
-  description: string;
+
+function toEventCardType(vm: EventItem): EventCardType {
+const { date, time } = formatDateRange(vm);
+return {
+id: vm.id,
+title: vm.title,
+date,
+time,
+location: vm.location ?? '',
+description: vm.description ?? '',
+status: vm.status,
+};
 }
 
-const eventsData: EventType[] = [
-  {
-    id: 1,
-    title: 'Spring Recital',
-    date: '2025-05-10',
-    time: '7:00 PM',
-    location: 'Royce Hall, UCLA',
-    description: 'Join us for our annual spring recital showcasing traditional mariachi music!'
-  },
-  {
-    id: 2,
-    title: 'Community Festival Performance',
-    date: '2025-06-05',
-    time: '2:00 PM',
-    location: 'Olvera Street, Los Angeles',
-    description: 'Celebrate with us at Olvera Street with live mariachi music and cultural festivities.'
-  },
-  {
-    id: 3,
-    title: 'test',
-    date: '2025-06-05',
-    time: '3:00 PM',
-    location: 'Olvera Street, Los Angeles',
-    description: 'Celebrate with us at Olvera Street with live mariachi music and cultural festivities.'
-  }
-  // Add more events here
-];
 
-const Events = () => {
-  const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null);
+const MembersEvents: React.FC = () => {
+const [events, setEvents] = React.useState<EventCardType[]>([]);
+const [active, setActive] = React.useState<EventCardType | null>(null);
+const [loading, setLoading] = React.useState(true);
 
-  return (
-    <div className="events-page">
-      <h1>Upcoming Performances</h1>
-      <div className="events-grid">
-        {eventsData.map(event => (
-          <EventCard key={event.id} event={event} onClick={() => setSelectedEvent(event)} />
-        ))}
-      </div>
-      {selectedEvent && (
-        <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
-      )}
-    </div>
-  );
+
+React.useEffect(() => {
+const unsub = observeEvents(
+(list) => { setEvents(list.map(toEventCardType)); setLoading(false); },
+(err) => { console.error('[Events subscribe]', err); setLoading(false); }
+);
+return () => unsub();
+}, []);
+
+
+return (
+<section className="ucla-content" style={{ maxWidth: 980, margin: '0 auto' }}>
+<h1 className="ucla-heading-xl">Upcoming Events</h1>
+{loading && <p>Loading events…</p>}
+{!loading && events.length === 0 && <p>No events yet.</p>}
+
+
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
+{events.map((ev) => (
+<EventCard key={ev.id} event={ev} onClick={() => setActive(ev)} />
+))}
+</div>
+
+
+{active && <EventModal event={active} onClose={() => setActive(null)} />}
+</section>
+);
 };
 
-export default Events;
+
+export default MembersEvents;

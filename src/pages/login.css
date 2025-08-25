@@ -1,37 +1,21 @@
 /* Login.css */
 
-/* Fullscreen background */
+/* Container */
 .background {
     width: 100%;
     min-height: 100vh;
-    background: linear-gradient(135deg, #2774AE, #003B5C);
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     padding: 2rem;
     box-sizing: border-box;
+    background: none;     /* ⬅ remove gradient */
   }
   
-  /* Decorative shapes */
+  /* Remove decorative shapes */
   .shape {
-    position: absolute;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 50%;
-  }
-  
-  .shape:first-of-type {
-    width: 200px;
-    height: 200px;
-    top: 10%;
-    left: 5%;
-  }
-  
-  .shape:last-of-type {
-    width: 300px;
-    height: 300px;
-    bottom: 15%;
-    right: 8%;
+    display: none;        /* ⬅ hide the circles entirely */
   }
   
   /* Form container */

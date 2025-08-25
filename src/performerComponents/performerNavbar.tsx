@@ -3,6 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import './performerNavbar.css';
 
+
 const PerformerNavbar: React.FC = () => {
   return (
     <nav className="member-navbar">

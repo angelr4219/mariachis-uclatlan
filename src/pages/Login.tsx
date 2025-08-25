@@ -1,7 +1,7 @@
-// src/Pages/Login.tsx
-import React, { useEffect, useState } from 'react';
+// src/pages/Login.tsx
+import React, { useEffect, useMemo, useState } from 'react';
 import './Login.css';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
@@ -19,20 +19,22 @@ declare global {
   }
 }
 
+const E164_RE = /^\+[1-9]\d{7,14}$/; // basic E.164 sanity check
+
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const [phone, setPhone] = useState(''); // +1##########
+  const [phone, setPhone] = useState(''); // e.g. +13105551234
   const [code, setCode] = useState('');
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const goMembers = () => navigate('/members-only');
+  const goMembers = () => navigate('/members'); // ✅ align with App.tsx
 
-  // if already signed in, bounce to members
+  // If already signed in, bounce to members
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u) goMembers();
@@ -43,6 +45,7 @@ const Login: React.FC = () => {
   // ---------------- Email / Password ----------------
   const handleEmailLogin: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
     setLoading(true);
     try {
@@ -58,6 +61,7 @@ const Login: React.FC = () => {
 
   // ---------------- Google ----------------
   const handleGoogleLogin = async () => {
+    if (loading) return;
     setError('');
     setLoading(true);
     try {
@@ -73,6 +77,7 @@ const Login: React.FC = () => {
   };
 
   // ---------------- Phone (reCAPTCHA + SMS) ----------------
+  // Lazily create an invisible reCAPTCHA. Works for modular and compat builds.
   const ensureRecaptcha = (): RecaptchaVerifier => {
     if (window.recaptchaVerifier) return window.recaptchaVerifier;
 
@@ -86,7 +91,22 @@ const Login: React.FC = () => {
     return window.recaptchaVerifier!;
   };
 
+  // Clean up recaptcha instance on unmount to prevent duplicates during HMR
+  useEffect(() => {
+    return () => {
+      try {
+        // @ts-ignore — both modular/compat expose clear/reset semantics
+        window.recaptchaVerifier?.clear?.();
+      } catch {}
+      // drop reference either way
+      window.recaptchaVerifier = undefined;
+    };
+  }, []);
+
+  const phoneValid = useMemo(() => E164_RE.test(phone.trim()), [phone]);
+
   const sendPhoneCode = async () => {
+    if (loading || !phoneValid) return;
     setError('');
     setLoading(true);
     try {
@@ -96,13 +116,18 @@ const Login: React.FC = () => {
     } catch (err: any) {
       console.error('[sendPhoneCode] ', err);
       setError(err?.message ?? 'Failed to send code');
+      // Reset the widget so the user can retry
+      try {
+        // @ts-ignore compat API
+        window.recaptchaVerifier?.reset?.();
+      } catch {}
     } finally {
       setLoading(false);
     }
   };
 
   const verifyPhoneCode = async () => {
-    if (!confirmationResult) return;
+    if (!confirmationResult || loading || code.trim().length < 6) return;
     setError('');
     setLoading(true);
     try {
@@ -122,7 +147,7 @@ const Login: React.FC = () => {
         <div className="shape" />
         <div className="shape" />
 
-        <form onSubmit={handleEmailLogin}>
+        <form onSubmit={handleEmailLogin} aria-busy={loading}>
           <h3>Login Here</h3>
 
           <label htmlFor="email">Email</label>
@@ -134,6 +159,7 @@ const Login: React.FC = () => {
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             required
+            disabled={loading}
           />
 
           <label htmlFor="password">Password</label>
@@ -145,6 +171,7 @@ const Login: React.FC = () => {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
+            disabled={loading}
           />
 
           <button type="submit" disabled={loading}>
@@ -163,7 +190,9 @@ const Login: React.FC = () => {
             </button>
           </div>
 
-          <div style={{ marginTop: 24 }}>
+          {/* Phone sign-in */}
+          <fieldset style={{ marginTop: 24, border: 'none', padding: 0 }}>
+            <legend style={{ fontWeight: 600, marginBottom: 8 }}>Or sign in with phone</legend>
             {!confirmationResult ? (
               <>
                 <label htmlFor="phone">Phone (E.164, e.g. +13105551234)</label>
@@ -173,8 +202,10 @@ const Login: React.FC = () => {
                   placeholder="+1##########"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  disabled={loading}
+                  aria-invalid={phone.length > 0 && !phoneValid}
                 />
-                <button type="button" onClick={sendPhoneCode} disabled={loading || !phone}>
+                <button type="button" onClick={sendPhoneCode} disabled={loading || !phoneValid}>
                   Send verification code
                 </button>
               </>
@@ -187,16 +218,35 @@ const Login: React.FC = () => {
                   placeholder="123456"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
+                  disabled={loading}
                 />
-                <button type="button" onClick={verifyPhoneCode} disabled={loading || !code}>
+                <button type="button" onClick={verifyPhoneCode} disabled={loading || code.trim().length < 6}>
                   Verify & Sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmationResult(null);
+                    setCode('');
+                    try { /* allow retry */ // @ts-ignore compat API
+                      window.recaptchaVerifier?.reset?.();
+                    } catch {}
+                  }}
+                  disabled={loading}
+                  style={{ marginLeft: 8 }}
+                >
+                  Use a different phone
                 </button>
               </>
             )}
-          </div>
+          </fieldset>
 
-          {error && <p style={{ color: 'salmon', marginTop: 16 }}>{error}</p>}
+          {error && <p style={{ color: 'salmon', marginTop: 16 }} role="alert">{error}</p>}
           <div id="recaptcha-container" />
+
+          <p style={{ marginTop: 16 }}>
+            No account? <Link to="/register">Register</Link>
+          </p>
         </form>
       </div>
     </div>
