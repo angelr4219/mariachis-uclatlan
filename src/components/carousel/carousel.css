@@ -1,33 +1,113 @@
-/* src/components/Carousel.css */
+
+/* -------------------------------------------------------
+   src/components/carousel/Carousel.css
+------------------------------------------------------- */
+:root {
+  /* feel free to tweak */
+  --carousel-btn-bg: rgba(17, 17, 17, 0.55);
+  --carousel-btn-bg-hover: rgba(17, 17, 17, 0.8);
+  --carousel-btn-backdrop: blur(4px);
+  --carousel-indicator-size: 10px;
+  --carousel-indicator-gap: 10px;
+  --carousel-indicator-active: white;
+  --carousel-indicator-inactive: rgba(255,255,255,0.6);
+}
+
 .carousel {
   position: relative;
   width: 100%;
-  max-width: 800px;
-  margin: 2rem auto;
+  max-width: 1100px; /* a bit wider */
+  margin: 1.5rem auto;
   overflow: hidden;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  border-radius: 16px; /* softer corners */
+  box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+  aspect-ratio: var(--carousel-aspect, 16/9);
+  background: #0e0e0e; /* prevents flash while images load */
+}
+
+.carousel-viewport {
+  width: 100%;
+  height: 100%;
+}
+
+.carousel-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+
+.carousel-slide {
+  min-width: 100%;
+  height: 100%;
+  position: relative;
 }
 
 .carousel-image {
   width: 100%;
-  display: block;
+  height: 100%;
   object-fit: cover;
-  transition: transform 0.5s ease-in-out;
+  display: block;
+}
+
+/* Subtle bottom gradient to help overlaid content later if needed */
+.carousel-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.45), transparent 40%);
+  pointer-events: none;
 }
 
 .carousel-button {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(0,0,0,0.5);
-  color: white;
   border: none;
-  font-size: 2rem;
-  padding: 0.5rem 1rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  color: #fff;
+  background: var(--carousel-btn-bg);
+  backdrop-filter: var(--carousel-btn-backdrop);
   cursor: pointer;
-  z-index: 2;
+  z-index: 3;
+  transition: background 160ms ease, transform 160ms ease;
+}
+.carousel-button:hover { background: var(--carousel-btn-bg-hover); transform: translateY(-50%) scale(1.05); }
+.carousel-button:active { transform: translateY(-50%) scale(0.98); }
+
+.prev { left: 12px; }
+.next { right: 12px; }
+
+/* Indicators */
+.carousel-indicators {
+  position: absolute;
+  left: 0; right: 0; bottom: 10px;
+  display: flex;
+  justify-content: center;
+  gap: var(--carousel-indicator-gap);
+  z-index: 4;
 }
 
-.prev { left: 10px; }
-.next { right: 10px; }
+.carousel-indicator {
+  width: var(--carousel-indicator-size);
+  height: var(--carousel-indicator-size);
+  border-radius: 999px;
+  background: var(--carousel-indicator-inactive);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease;
+}
+.carousel-indicator:hover { transform: scale(1.2); }
+.carousel-indicator.active { background: var(--carousel-indicator-active); }
+
+/* Small screens: slightly taller aspect for mobile hero feel */
+@media (max-width: 640px) {
+  .carousel { aspect-ratio: var(--carousel-aspect, 4/3); border-radius: 14px; }
+  .carousel-button { width: 40px; height: 40px; font-size: 24px; }
+}

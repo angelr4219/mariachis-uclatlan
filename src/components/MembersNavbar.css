@@ -1,32 +1,45 @@
-
-
 .member-navbar {
-  background-color: #005587;
+  background-color: #005587; /* UCLA Blue */
   color: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
-  font-family: 'Helvetica Neue', sans-serif;
+  padding: 0.75rem 2rem;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
 }
 
 .member-brand {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: bold;
+  color: #FFD100; /* UCLA Gold for emphasis */
 }
 
 .member-links {
   list-style: none;
   display: flex;
-  gap: 1.5rem;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+}
+
+.member-links li {
+  display: flex;
+  align-items: center;
 }
 
 .member-links li a {
   color: white;
   text-decoration: none;
   font-weight: 500;
+  font-size: 1rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
 .member-links li a:hover {
-  text-decoration: underline;
+  background-color: rgba(255, 209, 0, 0.2); /* Gold hover highlight */
+  color: #FFD100;
+  text-decoration: none;
 }
