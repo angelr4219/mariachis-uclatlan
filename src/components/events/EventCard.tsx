@@ -1,39 +1,28 @@
+// src/components/events/EventCard.tsx
 import React from 'react';
+import type { EventCardVM } from '../../types/events';
 import './EventCard.css';
 
-export interface EventType {
-  id: string;
-  title: string;
-  date: string;       // e.g., "Sep 2, 2025"
-  time: string;       // e.g., "3:00 PM – 5:00 PM"
-  location: string;
-  description: string;
-  status?: 'draft' | 'published' | 'cancelled';
-}
+export type EventType = EventCardVM;
 
-interface Props {
+type Props = {
   event: EventType;
-  onClick: () => void;
-}
+  onClick?: () => void;
+};
 
-const EventCardBase: React.FC<Props> = ({ event, onClick }) => {
-  const statusClass = event.status ? `status-${event.status}` : '';
-
+const EventCard: React.FC<Props> = ({ event, onClick }) => {
   return (
-    <button
-      type="button"
-      className={`event-card ${statusClass}`}
-      onClick={onClick}
-      aria-label={`Open details for ${event.title}`}
-      title={event.title}
-      data-id={event.id}
-    >
-      <h3 className="event-title">{event.title}</h3>
-      <p className="event-meta">{event.date} · {event.time}</p>
-      {event.location && <p className="event-loc">{event.location}</p>}
-    </button>
+    <div className="event-card" onClick={onClick} role={onClick ? 'button' : undefined}>
+      <div className="event-head">
+        <h3>{event.title}</h3>
+        <span className={`pill pill-${event.status}`}>{event.status}</span>
+      </div>
+      <div className="event-sub">
+        {event.date} • {event.time} • {event.location}
+      </div>
+      {event.description && <p className="event-notes">{event.description}</p>}
+    </div>
   );
 };
 
-const EventCard = React.memo(EventCardBase);
 export default EventCard;

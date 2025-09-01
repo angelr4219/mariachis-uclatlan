@@ -1,0 +1,9 @@
+.booking-wrap { max-width: 800px; margin: 0 auto; padding: 16px; }
+.booking-form { display: grid; gap: 12px; }
+.booking-form .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.booking-form label { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
+.booking-form input, .booking-form textarea { padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; font: inherit; }
+.btn { padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #0ea5e9; color: white; font-weight: 700; cursor: pointer; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.ok { color: #16a34a; font-weight: 600; }
+.err { color: #ef4444; font-weight: 600; }

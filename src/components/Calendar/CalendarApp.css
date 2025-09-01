@@ -1,17 +1,33 @@
-.cal-wrap { border: 1px solid #e5e5e5; border-radius: 10px; overflow: hidden; background: #fff; }
-.cal-header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid #eee; }
-.cal-title { font-weight: 700; }
-.cal-nav { background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
-.cal-weekdays { background: #fafafa; border-bottom: 1px solid #eee; }
-.cal-weekday { padding: 0.5rem; text-align: center; font-weight: 600; color: #666; }
-.cal-cell { min-height: 110px; border-right: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; padding: 0.35rem; }
-.cal-cell:nth-child(7n) { border-right: none; }
-.cal-date { font-size: 0.9rem; font-weight: 700; color: #555; }
-.cal-date.today { color: #2774AE; }
-.muted { background: #fcfcfc; }
-.cal-events { margin-top: 0.35rem; display: flex; flex-direction: column; gap: 4px; }
-.cal-pill { text-align: left; border: none; border-radius: 999px; padding: 0.25rem 0.5rem; background: #eaf3fb; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cal-more { font-size: 0.8rem; color: #666; margin-top: 2px; }
-@media (max-width: 640px) { .cal-cell { min-height: 90px; } }
 
+/* Basic, clean styling for calendar/list */
+.event-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.event-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.event-card.assigned { border-color: #059669; box-shadow: 0 0 0 2px rgba(5,150,105,0.15); }
+.event-head { display: flex; align-items: center; justify-content: space-between; }
+.status { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 6px; }
+.status.published { background: #dcfce7; color: #065f46; }
+.status.draft { background: #fee2e2; color: #991b1b; }
+.status.cancelled { background: #e5e7eb; color: #374151; }
+
+.event-meta { color: #374151; font-size: 0.95rem; display: grid; gap: 0.25rem; margin-top: 0.5rem; }
+.event-roles ul { margin: 0.25rem 0 0 1.25rem; }
+.event-notes { margin-top: 0.5rem; color: #111827; }
+
+.event-rsvp { margin-top: 0.75rem; }
+
+.rsvp-buttons { display: flex; gap: 0.5rem; }
+.rsvp-btn { border: 1px solid #e5e7eb; padding: 0.35rem 0.75rem; border-radius: 9999px; cursor: pointer; }
+.rsvp-btn.active { border-color: #111827; }
+.rsvp-btn.accepted { background: #dcfce7; }
+.rsvp-btn.tentative { background: #fef3c7; }
+.rsvp-btn.declined { background: #fee2e2; }

@@ -34,6 +34,13 @@ import Join from './pages/joinUs';
 import AdminManageMembers from './adminComponents/AdminManageMembers';
 import AdminReports from './adminComponents/AdminReports';
 
+
+import AdminEvents from './pages/admin/AdminEvents';
+import MemberEvents from './pages/Members/MemberEvents';
+import HireUs from './pages/HireUs';
+
+import ClientBooking from './pages/ClientBooking';
+
 const App: React.FC = () => {
   const [user, setUser] = React.useState<any>(null);
   const [setClaims] = React.useState<any>(null);
@@ -106,6 +113,10 @@ const App: React.FC = () => {
           <Route path="/members/manage" element={user ? <ManageMembersPage /> : <Navigate to="/login" replace />} />
           <Route path="/members/calendar" element={<Calendar />} />
 
+          <Route path="/admin/events" element={<AdminEvents />} />
+          <Route path="/members/events" element={<MemberEvents />} />
+          <Route path="/hire-us" element={<HireUs />} />
+
           {/* Dashboards */}
           <Route
             path="/dashboard"
@@ -117,6 +128,8 @@ const App: React.FC = () => {
               />
             }
           />
+
+          <Route path="/book-us" element={<ClientBooking />} />
 
           {/* ✅ Admin-only routes */}
           <Route

@@ -1,26 +1,8 @@
-.event-card {
-    background: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    padding: 1.5rem;
-    width: 250px;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  
-  .event-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-  }
-  
-  .event-card h3 {
-    margin-bottom: 1rem;
-    color: #007bff;
-  }
-  
-  .event-card p {
-    margin: 0.3rem 0;
-    color: #333;
-    font-size: 1rem;
-  }
-  
+.event-card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;display:grid;gap:8px}
+.event-head{display:flex;gap:12px;align-items:baseline;justify-content:space-between}
+.event-sub{color:#475569;font-size:14px}
+.pill{padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;color:#fff}
+.pill-published{background:#0d9488}
+.pill-draft{background:#64748b}
+.pill-cancelled{background:#ef4444}
+.event-notes{margin:8px 0}
