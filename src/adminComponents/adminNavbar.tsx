@@ -11,7 +11,8 @@ const AdminNavbar: React.FC = () => {
       <ul className="member-links">
         <li><Link to="/dashboard">Dashboard</Link></li>
         <li><Link to="/members/profile">Profile</Link></li>
-        <li><Link to="/members/events">Events</Link></li>
+        {/* 🔄 Replace with Admin Events route */}
+        <li><Link to="/admin/events">Events</Link></li>
         <li><Link to="/members/resources">Resources</Link></li>
         <li><Link to="/members/settings">Settings</Link></li>
         <li><Link to="/members/performer-availability">Availability</Link></li>

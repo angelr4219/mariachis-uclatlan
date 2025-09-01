@@ -1,29 +1,20 @@
-// ---------------------------------------------
-// src/components/calendar/CalendarApp.tsx
-// ---------------------------------------------
+// ==============================
+// FILE: src/components/Calendar/CalendarApp.tsx
+// ==============================
 import React from 'react';
-import './calendarApp.css';
+import './CalendarApp.css';
 import type { EventItem } from '../../types/events';
 
 export interface CalendarAppProps {
-  /** List of events (start/end as JS Date) */
-  events: EventItem[];
-  /** Initial month (0–11). Defaults to current month. */
-  month?: number;
-  /** Initial year (four-digit). Defaults to current year. */
-  year?: number;
-  /** 0 = Sunday, 1 = Monday (default 0). */
-  firstDayOfWeek?: 0 | 1;
-  /** Click handler for an event pill. */
+  events: EventItem[];              // start/end as JS Date
+  month?: number;                   // 0–11
+  year?: number;                    // YYYY
+  firstDayOfWeek?: 0 | 1;           // 0=Sun (default), 1=Mon
   onEventClick?: (ev: EventItem) => void;
-  /** Called whenever the visible month changes. */
   onMonthChange?: (year: number, month: number) => void;
-  /** Custom renderer for the event pill text. */
   renderEvent?: (ev: EventItem) => React.ReactNode;
-  /** Max pills to show per day cell (rest shows as "+N more"). Default 3. */
-  maxPillsPerDay?: number;
-  /** If true, events spanning multiple days appear on each day in the range. Default true. */
-  expandMultiDay?: boolean;
+  maxPillsPerDay?: number;          // default 3
+  expandMultiDay?: boolean;         // default true
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -41,8 +32,7 @@ const addDays = (d: Date, n: number) => {
 
 function buildGrid(cursor: Date, firstDOW: 0 | 1): Date[] {
   const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-  // How many days to back up to reach firstDOW (0=Sun or 1=Mon)
-  const delta = (firstOfMonth.getDay() - firstDOW + 7) % 7;
+  const delta = (firstOfMonth.getDay() - firstDOW + 7) % 7; // back up to firstDOW
   const start = addDays(firstOfMonth, -delta);
   const cells: Date[] = [];
   for (let i = 0; i < 42; i++) cells.push(addDays(start, i)); // 6 weeks
@@ -56,7 +46,6 @@ function rotate<T>(arr: T[], by: number) {
 }
 
 function keyOf(d: Date) {
-  // yyyy-mm-dd in local time
   const y = d.getFullYear();
   const m = (d.getMonth() + 1).toString().padStart(2, '0');
   const day = d.getDate().toString().padStart(2, '0');
@@ -67,7 +56,9 @@ function groupEventsByDay(events: EventItem[], expandMultiDay: boolean): Map<str
   const map = new Map<string, EventItem[]>();
   for (const ev of events) {
     const start = new Date(ev.start.getFullYear(), ev.start.getMonth(), ev.start.getDate());
-    const lastDate = ev.end && ev.end > ev.start ? new Date(ev.end.getFullYear(), ev.end.getMonth(), ev.end.getDate()) : start;
+    const lastDate = ev.end && ev.end > ev.start
+      ? new Date(ev.end.getFullYear(), ev.end.getMonth(), ev.end.getDate())
+      : start;
 
     if (!expandMultiDay) {
       const k = keyOf(start);
@@ -76,9 +67,7 @@ function groupEventsByDay(events: EventItem[], expandMultiDay: boolean): Map<str
       continue;
     }
 
-    // Add an entry for each day in [start, lastDate] (with a safety guard)
-    let d = start;
-    let guard = 0;
+    let d = start; let guard = 0;
     while (d <= lastDate && guard++ < 60) {
       const k = keyOf(d);
       if (!map.has(k)) map.set(k, []);
@@ -104,7 +93,6 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
     new Date(year ?? new Date().getFullYear(), month ?? new Date().getMonth(), 1)
   );
 
-  // Notify parent when cursor changes month/year
   React.useEffect(() => {
     onMonthChange?.(cursor.getFullYear(), cursor.getMonth());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,20 +112,14 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
   return (
     <div className="cal-wrap" role="group" aria-label="Calendar">
       <div className="cal-header">
-        <button type="button" className="cal-nav" onClick={prevMonth} aria-label="Previous month">
-          ◀
-        </button>
+        <button type="button" className="cal-nav" onClick={prevMonth} aria-label="Previous month">◀</button>
         <div className="cal-title" aria-live="polite">{monthTitle(cursor)}</div>
-        <button type="button" className="cal-nav" onClick={nextMonth} aria-label="Next month">
-          ▶
-        </button>
+        <button type="button" className="cal-nav" onClick={nextMonth} aria-label="Next month">▶</button>
       </div>
 
       <div className="cal-grid cal-weekdays" role="row">
         {weekdayLabels.map((w) => (
-          <div key={w} className="cal-weekday" role="columnheader" aria-label={w}>
-            {w}
-          </div>
+          <div key={w} className="cal-weekday" role="columnheader" aria-label={w}>{w}</div>
         ))}
       </div>
 
@@ -181,3 +163,6 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
 };
 
 export default CalendarApp;
+
+
+
