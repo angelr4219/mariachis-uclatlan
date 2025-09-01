@@ -1,27 +1,44 @@
-// src/components/AdminNavbar.tsx
+// ===============================
+// FILE: src/components/AdminNavbar.tsx
+// ===============================
 import React from 'react';
-import { Link } from 'react-router-dom';
-import '../components/MembersNavbar.css';  // ✅ Correct relative path to components folder
-
+import { NavLink } from 'react-router-dom';
+import './AdminNavbar.css';
 
 const AdminNavbar: React.FC = () => {
   return (
-    <nav className="member-navbar">
-      <div className="member-brand">Admin Portal</div>
-      <ul className="member-links">
-        <li><Link to="/dashboard">Dashboard</Link></li>
-        <li><Link to="/members/profile">Profile</Link></li>
-        {/* 🔄 Replace with Admin Events route */}
-        <li><Link to="/admin/events">Events</Link></li>
-        <li><Link to="/members/resources">Resources</Link></li>
-        <li><Link to="/members/settings">Settings</Link></li>
-        <li><Link to="/members/performer-availability">Availability</Link></li>
-        <li><Link to="/admin">Admin Panel</Link></li>
-        <li><Link to="/members/manage">Manage Members</Link></li>
-        <li><Link to="/">Public Site</Link></li>
+    <nav className="admin-navbar" role="navigation" aria-label="Admin Navigation Bar">
+      <div className="admin-brand">Admin Portal</div>
+      <button className="admin-menu-toggle" aria-label="Toggle menu" onClick={() => {
+        const el = document.querySelector('.admin-links');
+        el?.classList.toggle('open');
+      }}>☰</button>
+      <ul className="admin-links">
+        <li>
+          <NavLink to="/admin" end className={({ isActive }) => isActive ? 'active' : ''}>Dashboard</NavLink>
+        </li>
+        <li>
+          <NavLink to="/admin/events" className={({ isActive }) => isActive ? 'active' : ''}>Events</NavLink>
+        </li>
+        <li>
+          <NavLink to="/admin/members" className={({ isActive }) => isActive ? 'active' : ''}>Manage Members</NavLink>
+        </li>
+        <li>
+          <NavLink to="/admin/reports" className={({ isActive }) => isActive ? 'active' : ''}>Reports</NavLink>
+        </li>
+        <li>
+          <NavLink to="/members/performer-availability" className={({ isActive }) => isActive ? 'active' : ''}>Availability</NavLink>
+        </li>
+        <li className="divider" aria-hidden>│</li>
+        <li>
+          <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''}>Public Site</NavLink>
+        </li>
       </ul>
     </nav>
   );
 };
 
 export default AdminNavbar;
+
+
+

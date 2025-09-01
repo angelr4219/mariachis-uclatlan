@@ -1,33 +1,74 @@
 
 
-.member-navbar {
-    background-color: #005587;
-    color: rgb(209, 35, 35);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 2rem;
-    font-family: 'Helvetica Neue', sans-serif;
-  }
-  
-  .member-brand {
-    font-size: 1.5rem;
-    font-weight: bold;
-  }
-  
-  .member-links {
-    list-style: none;
-    display: flex;
-    gap: 1.5rem;
-  }
-  
-  .member-links li a {
-    color: white;
-    text-decoration: none;
-    font-weight: 500;
-  }
-  
-  .member-links li a:hover {
-    text-decoration: underline;
-  }
-  
+:root {
+  --admin-bg: #073642;     /* deep teal (Solarized base02) */
+  --admin-bg-2: #0b4a5a;   /* slightly lighter for hover */
+  --admin-accent: #b58900; /* amber accent */
+  --admin-text: #fdf6e3;   /* light cream text */
+}
+
+.admin-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.admin-brand {
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.admin-menu-toggle {
+  display: none;
+  font-size: 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--admin-text);
+  cursor: pointer;
+}
+
+.admin-links {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-links li a {
+  text-decoration: none;
+  color: var(--admin-text);
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.admin-links li a:hover {
+  background: var(--admin-bg-2);
+}
+
+.admin-links li a.active {
+  background: rgba(181, 137, 0, 0.2); /* amber tint */
+  box-shadow: 0 0 0 1px rgba(181,137,0,0.35) inset;
+}
+
+.admin-links .divider {
+  opacity: 0.4;
+}
+
+/* --- Responsive --- */
+@media (max-width: 800px) {
+  .admin-menu-toggle { display: inline-block; }
+  .admin-links { display: none; flex-direction: column; align-items: flex-start; width: 100%; }
+  .admin-links.open { display: flex; }
+  .admin-navbar { flex-wrap: wrap; }
+}

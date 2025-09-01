@@ -40,6 +40,8 @@ import AdminRoute from './routes/AdminRoute';
 import MemberRoute from './routes/MemberRoute';
 import PerformerRoute from './routes/PerformerRoute';
 
+import { isAdminEmail, isPerformerEmail } from './config/roles';
+
 import RSVP from './pages/Members/RSVP';
 import LoadingScreen from './pages/LoadingScreen';
 import NotAuthorized from './pages/NotAuthorized';
@@ -57,31 +59,48 @@ const App: React.FC = () => {
       try {
         setUser(currentUser);
         setLoading(true);
+        let foundRoles: string[] = [];
+
         if (currentUser) {
-          // Prefer Firestore profile roles; fall back to custom claims if present
-          let foundRoles: string[] = [];
+          // 1) Firestore profile roles
           try {
             const ref = doc(db, 'profiles', currentUser.uid);
             const snap = await getDoc(ref);
             if (snap.exists()) {
               const data = snap.data() as any;
-              if (Array.isArray(data.roles)) foundRoles = data.roles.map((r: any) => String(r).toLowerCase());
+              if (Array.isArray(data.roles)) {
+                foundRoles = data.roles.map((r: any) => String(r).toLowerCase());
+              }
             }
           } catch (e) {
-            console.warn('Failed to load profile roles', e);
+            console.warn('[roles] profiles fetch failed:', e);
           }
 
+          // 2) Custom claims fallback
           if (foundRoles.length === 0) {
             try {
               const tokenResult = await getIdTokenResult(currentUser);
               const claimRoles = (tokenResult.claims.roles || []) as any[];
-              if (Array.isArray(claimRoles)) foundRoles = claimRoles.map((r) => String(r).toLowerCase());
-              if ((tokenResult.claims as any).admin && !foundRoles.includes('admin')) foundRoles.push('admin');
+              if (Array.isArray(claimRoles)) {
+                foundRoles = claimRoles.map((r) => String(r).toLowerCase());
+              }
+              if ((tokenResult.claims as any).admin && !foundRoles.includes('admin')) {
+                foundRoles.push('admin');
+              }
             } catch (e) {
-              console.warn('Failed to load custom claims', e);
+              console.warn('[roles] claims fetch failed:', e);
             }
           }
 
+          // 3) HARD-CODED ALLOWLIST (local/dev bootstrap)
+          if (isAdminEmail(currentUser.email) && !foundRoles.includes('admin')) {
+            foundRoles.push('admin');
+          }
+          if (isPerformerEmail(currentUser.email) && !foundRoles.includes('performer')) {
+            foundRoles.push('performer');
+          }
+
+          console.log('[roles] resolved', { email: currentUser.email, foundRoles });
           setRoles(foundRoles);
         } else {
           setRoles([]);
@@ -90,6 +109,7 @@ const App: React.FC = () => {
         setLoading(false);
       }
     });
+
     return () => unsubscribe();
   }, []);
 
