@@ -1,47 +1,50 @@
-
 // src/components/RSVPPanel.tsx
 import React, { useEffect, useState } from 'react';
-import { getAuth } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase';
 import type { RSVPDoc } from '../types/rsvp';
-import type { EventItem } from '../types/events';
+import type { EventItem, RSVPStatus } from '../types/events';
 import { getMyRSVP, setRSVP } from '../services/events';
+import RSVPButtons from './RSVPButtons';
 import './RSVPPanel.css';
 
 export default function RSVPPanel({ event }: { event: EventItem }) {
-  const user = getAuth().currentUser;
+  const [uid, setUid] = useState<string | null>(null);
   const [mine, setMine] = useState<RSVPDoc | null>(null);
   const [loading, setLoading] = useState(true);
+  const disabled = event.status !== 'published';
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!user) { setLoading(false); return; }
-      const r = await getMyRSVP(event.id, user.uid);
-      if (alive) { setMine(r); setLoading(false); }
-    })();
-    return () => { alive = false; };
-  }, [event.id, user?.uid]);
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!u) { setUid(null); setMine(null); setLoading(false); return; }
+      setUid(u.uid);
+      setLoading(true);
+      const r = await getMyRSVP(event.id, u.uid);
+      setMine(r);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [event.id]);
 
-  async function choose(status: RSVPDoc['status']) {
-    if (!user) return;
+  const handleChange = async (next: RSVPStatus) => {
+    if (!uid) return;
+
     const r: RSVPDoc = {
-      uid: user.uid,
-      displayName: user.displayName ?? user.email ?? 'Unknown',
-      role: mine?.role,
-      status,
+      uid,
+      status: next,                // 'accepted' | 'maybe' | 'declined'
       updatedAt: Date.now(),
+      ...(mine?.role ? { role: mine.role } : {}),                // ✅ no nulls
+      ...(mine?.displayName ? { displayName: mine.displayName } : {}), // ✅ if your type includes it
     };
+
     await setRSVP(event.id, r);
     setMine(r);
-  }
-
-  const disabled = event.status !== 'published';
+  };
 
   return (
     <div className="rsvp-panel">
-      <button disabled={disabled} className={`rsvp-btn ${mine?.status === 'accepted' ? 'active' : ''}`} onClick={() => choose('accepted')}>Accept</button>
-      <button disabled={disabled} className={`rsvp-btn ${mine?.status === 'tentative' ? 'active' : ''}`} onClick={() => choose('tentative')}>Tentative</button>
-      <button disabled={disabled} className={`rsvp-btn ${mine?.status === 'declined' ? 'active' : ''}`} onClick={() => choose('declined')}>Decline</button>
+      <RSVPButtons value={mine?.status} onChange={handleChange} compact />
+      {disabled && <span className="rsvp-note">RSVP disabled (event not published)</span>}
       {loading && <span className="rsvp-loading">Loading…</span>}
     </div>
   );

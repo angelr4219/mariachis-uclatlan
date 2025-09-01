@@ -1,7 +1,8 @@
-// src/pages/Public/HireUs.tsx
+
 import React, { useState } from 'react';
 import { useRecaptcha } from './hooks/useRecaptcha';
 import { submitClientRequest } from '../services/publicClient';
+import './HireUs.css';
 
 export default function HireUs() {
   const [form, setForm] = useState({
@@ -9,14 +10,17 @@ export default function HireUs() {
     title: '', date: '', startTime: '', endTime: '', location: '', details: ''
   });
   const [ok, setOk] = useState<string>('');
+  const [err, setErr] = useState<string>('');
   const { execute } = useRecaptcha();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setOk(''); setErr('');
     try {
       const token = await execute('client_booking');
       const startIso = form.date && form.startTime ? new Date(`${form.date}T${form.startTime}`).toISOString() : undefined;
       const endIso = form.date && form.endTime ? new Date(`${form.date}T${form.endTime}`).toISOString() : undefined;
+
       await submitClientRequest({
         recaptchaToken: token,
         name: form.name,
@@ -32,15 +36,16 @@ export default function HireUs() {
           location: form.location || undefined,
         }
       });
-      setOk('Thanks! Your request was received. We\'ll reach out soon.');
+
+      setOk("Thanks! Your request was received. We'll reach out soon.");
       setForm({ name:'', email:'', phone:'', org:'', title:'', date:'', startTime:'', endTime:'', location:'', details:'' });
-    } catch (err: any) {
-      alert(err?.message || 'Failed to send');
+    } catch (e: any) {
+      setErr(e?.message || 'Failed to send');
     }
   }
 
   return (
-    <div style={{maxWidth: 720}}>
+    <div className="hireus">
       <h2>Hire Us</h2>
       <form onSubmit={onSubmit} className="event-form">
         <h3>Contact</h3>
@@ -52,7 +57,7 @@ export default function HireUs() {
         <h3>Event</h3>
         <input placeholder="Event title" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} required />
         <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
-        <div style={{display:'flex', gap:'0.5rem'}}>
+        <div className="time-row">
           <input type="time" value={form.startTime} onChange={e=>setForm(f=>({...f,startTime:e.target.value}))} />
           <input type="time" value={form.endTime} onChange={e=>setForm(f=>({...f,endTime:e.target.value}))} />
         </div>
@@ -60,8 +65,10 @@ export default function HireUs() {
         <textarea placeholder="Details / repertoire / special notes" value={form.details} onChange={e=>setForm(f=>({...f,details:e.target.value}))} />
 
         <button type="submit">Submit request</button>
+        {ok && <p className="ok">{ok}</p>}
+        {err && <p className="err">{err}</p>}
       </form>
-      {ok && <p style={{marginTop:'0.75rem'}}>{ok}</p>}
     </div>
   );
 }
+

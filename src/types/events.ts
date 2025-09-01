@@ -9,7 +9,7 @@
 
 import type { Timestamp } from 'firebase/firestore';
 import type { RoleNeed } from './rsvp';
-export type { RSVPStatus, RoleNeed, RSVPDoc } from './rsvp';
+export type { RoleNeed } from './rsvp';
 
 export type EventStatus = 'draft' | 'published' | 'cancelled';
 
@@ -71,4 +71,16 @@ export interface EventCardVM {
   location: string;
   description: string;
   status: EventStatus;
+}
+
+export type RSVPStatus = 'accepted' | 'declined' | 'tentative' | 'none';
+
+
+
+export interface RSVPDoc {
+uid: string;
+displayName?: string | null;
+role?: string | null;
+status: RSVPStatus; // 'accepted' | 'declined' | 'maybe'
+updatedAt?: any; // Firestore Timestamp (or number if you store ms)
 }

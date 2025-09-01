@@ -13,7 +13,7 @@ const MembersNavbar: React.FC = () => {
         <li><Link to="/members/profile">Profile</Link></li>
         <li><Link to="/admin/events">Events</Link></li>
         <li><Link to="/members/calendar">Calendar</Link></li>
-        <li><Link to="/members/resources">Resources</Link></li>
+        
         <li><Link to="/members/performer-availability">Availability</Link></li>
         <li><Link to="/members/settings">Settings</Link></li>
 
@@ -22,11 +22,10 @@ const MembersNavbar: React.FC = () => {
         <li><Link to="/performer-dashboard">Performer Dashboard</Link></li>
         <li><Link to="/admin-dashboard">Admin Dashboard</Link></li>
 
-        {/* Management */}
-        <li><Link to="/members/manage">Manage Members</Link></li>
+        
 
         {/* Back to public site */}
-        <li><Link to="/">← Public Site</Link></li>
+        <li><Link to="/">Public Site</Link></li>
       </ul>
     </nav>
   );

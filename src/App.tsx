@@ -1,6 +1,9 @@
-// src/App.tsx
+// =============================================
+// FILE: src/App.tsx (DROP-IN REPLACEMENT)
+// Adds: role detection (performer), loading state, and new route guards
+// =============================================
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
@@ -15,11 +18,12 @@ import PerformerAvailability from './pages/Members/PerformerAvailability';
 import ManageMembersPage from './pages/ManageMembers';
 import AdminDashboard from './adminComponents/adminDashboard';
 import PerformerDashboard from './performerComponents/PerformerDashboard';
-import Navbar from './components/Navbar';
-import Footer from './components/Footer';
-import MembersNavbar from './components/MembersNavbar';
-import AdminNavbar from './adminComponents/adminNavbar.tsx'; 
-import PerformerNavbar from './performerComponents/performerNavbar.tsx';  
+import AdminEvents from './pages/admin/AdminEvents';
+import MemberEvents from './pages/Members/MemberEvents';
+import HireUs from './pages/HireUs';
+import BookUs from './pages/bookUs';
+import Join from './pages/joinUs';
+import ClientBooking from './pages/ClientBooking';
 import Calendar from './pages/Members/Calendar';
 
 import RoleBasedLayout from './rolebasedlayout/rbl';
@@ -27,124 +31,259 @@ import { onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
-import BookUs from './pages/bookUs';
-import Join from './pages/joinUs';
+// Layouts & guards
+import PublicLayout from './layouts/publicLayout';
+import MembersLayout from './layouts/MembersLayout';
+import AdminLayout from './layouts/AdminLayout';
+import ProtectedRoute from './routes/ProtectedRoute';
+import AdminRoute from './routes/AdminRoute';
+import MemberRoute from './routes/MemberRoute';
+import PerformerRoute from './routes/PerformerRoute';
 
-// ✅ Admin-only pages
-import AdminManageMembers from './adminComponents/AdminManageMembers';
-import AdminReports from './adminComponents/AdminReports';
-
-
-import AdminEvents from './pages/admin/AdminEvents';
-import MemberEvents from './pages/Members/MemberEvents';
-import HireUs from './pages/HireUs';
-
-import ClientBooking from './pages/ClientBooking';
+import RSVP from './pages/Members/RSVP';
+import LoadingScreen from './pages/LoadingScreen';
+import NotAuthorized from './pages/NotAuthorized';
 
 const App: React.FC = () => {
   const [user, setUser] = React.useState<any>(null);
-  const [setClaims] = React.useState<any>(null);
-  const [isAdmin, setIsAdmin] = React.useState<boolean>(false); // ✅ added
-  const location = useLocation();
+  const [roles, setRoles] = React.useState<string[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  const isAdmin = roles.includes('admin');
+  const isPerformer = roles.includes('performer');
 
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const tokenResult = await getIdTokenResult(currentUser);
-        setClaims(tokenResult.claims);
-        console.log(tokenResult.claims);
+      try {
+        setUser(currentUser);
+        setLoading(true);
+        if (currentUser) {
+          // Prefer Firestore profile roles; fall back to custom claims if present
+          let foundRoles: string[] = [];
+          try {
+            const ref = doc(db, 'profiles', currentUser.uid);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+              const data = snap.data() as any;
+              if (Array.isArray(data.roles)) foundRoles = data.roles.map((r: any) => String(r).toLowerCase());
+            }
+          } catch (e) {
+            console.warn('Failed to load profile roles', e);
+          }
 
-        // ✅ fetch roles from Firestore profile
-        try {
-          const ref = doc(db, 'profiles', currentUser.uid);
-          const snap = await getDoc(ref);
-          const roles = snap.exists() ? (snap.data() as any).roles || [] : [];
-          setIsAdmin(Array.isArray(roles) && roles.includes('admin'));
-        } catch (e) {
-          console.warn('Failed to load profile roles', e);
-          setIsAdmin(false);
+          if (foundRoles.length === 0) {
+            try {
+              const tokenResult = await getIdTokenResult(currentUser);
+              const claimRoles = (tokenResult.claims.roles || []) as any[];
+              if (Array.isArray(claimRoles)) foundRoles = claimRoles.map((r) => String(r).toLowerCase());
+              if ((tokenResult.claims as any).admin && !foundRoles.includes('admin')) foundRoles.push('admin');
+            } catch (e) {
+              console.warn('Failed to load custom claims', e);
+            }
+          }
+
+          setRoles(foundRoles);
+        } else {
+          setRoles([]);
         }
-      } else {
-        setIsAdmin(false);
+      } finally {
+        setLoading(false);
       }
     });
     return () => unsubscribe();
   }, []);
 
-  const isMemberRoute = location.pathname.startsWith('/members');
-  const isDashboardRoute =
-    location.pathname.startsWith('/dashboard') ||
-    location.pathname.startsWith('/performer-dashboard') ||
-    location.pathname.startsWith('/admin-dashboard');
-  const isAdminRoute = location.pathname.startsWith('/admin-dashboard');
-  const isPerformerRoute = location.pathname.startsWith('/performer-dashboard');
+  if (loading) {
+    return (
+      <PublicLayout>
+        <LoadingScreen />
+      </PublicLayout>
+    );
+  }
 
   return (
-    <>
-      {/* Public Pages Navbar */}
-      {!isMemberRoute && !isDashboardRoute && <Navbar />}
+    <Routes>
+      {/* Public routes */}
+      <Route
+        path="/"
+        element={
+          <PublicLayout>
+            <Home />
+          </PublicLayout>
+        }
+      />
+      <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+      <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
+      <Route path="/book-us" element={<PublicLayout><BookUs /></PublicLayout>} />
+      <Route path="/join" element={<PublicLayout><Join /></PublicLayout>} />
+      <Route path="/client-booking" element={<PublicLayout><ClientBooking /></PublicLayout>} />
+      <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
+      <Route path="/register" element={<PublicLayout><Register /></PublicLayout>} />
 
-      {/* Member Pages Navbar */}
-      {isMemberRoute && user && <MembersNavbar />}
-      {/* Admin Pages Navbar */}
-      {isAdminRoute && user && <AdminNavbar />}
-      {/* Performer Pages Navbar */}
-      {isPerformerRoute && user && <PerformerNavbar />}
+      {/* Member routes (must be signed in) */}
+      <Route
+        path="/members"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <MembersOnly />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
+      <Route
+        path="/members/profile"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <MembersProfile />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
+      <Route
+        path="/members/events"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <MembersEvents />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
+      <Route
+        path="/members/resources"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <MembersResources />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
+      <Route
+        path="/members/settings"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <MembersSettings />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
+      <Route
+        path="/members/manage"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <ManageMembersPage />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
+      <Route
+        path="/members/calendar"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <Calendar />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
+      <Route
+        path="/members/rsvp"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <RSVP />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
 
-      <main className="ucla-container">
-        <Routes>
-          {/* Public Pages */}
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/book-us" element={<BookUs />} />
-          <Route path="/join" element={<Join />} />
+      {/* Performer-only route (admins allowed) */}
+      <Route
+        path="/members/performer-availability"
+        element={
+          <ProtectedRoute user={user}>
+            <PerformerRoute isPerformer={isPerformer} isAdmin={isAdmin}>
+              <MembersLayout>
+                <PerformerAvailability />
+              </MembersLayout>
+            </PerformerRoute>
+          </ProtectedRoute>
+        }
+      />
 
-          {/* Members Section */}
-          <Route path="/members" element={user ? <MembersOnly /> : <Navigate to="/login" replace />} />
-          <Route path="/members/profile" element={user ? <MembersProfile /> : <Navigate to="/login" replace />} />
-          <Route path="/members/events" element={user ? <MembersEvents /> : <Navigate to="/login" replace />} />
-          <Route path="/members/resources" element={user ? <MembersResources /> : <Navigate to="/login" replace />} />
-          <Route path="/members/settings" element={user ? <MembersSettings /> : <Navigate to="/login" replace />} />
-          <Route path="/members/performer-availability" element={user ? <PerformerAvailability /> : <Navigate to="/login" replace />} />
-          <Route path="/members/manage" element={user ? <ManageMembersPage /> : <Navigate to="/login" replace />} />
-          <Route path="/members/calendar" element={<Calendar />} />
+      {/* Dashboards */}
+      <Route
+        path="/dashboard"
+        element={
+          <PublicLayout>
+            <RoleBasedLayout
+              adminComponent={<AdminDashboard />}
+              performerComponent={<PerformerDashboard />}
+              publicComponent={<Home />}
+            />
+          </PublicLayout>
+        }
+      />
 
-          <Route path="/admin/events" element={<AdminEvents />} />
-          <Route path="/members/events" element={<MemberEvents />} />
-          <Route path="/hire-us" element={<HireUs />} />
+      {/* Admin only */}
+      <Route
+        path="/admin/events"
+        element={
+          <ProtectedRoute user={user}>
+            <AdminRoute isAdmin={isAdmin}>
+              <AdminLayout>
+                <AdminEvents />
+              </AdminLayout>
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/manage"
+        element={
+          <ProtectedRoute user={user}>
+            <AdminRoute isAdmin={isAdmin}>
+              <AdminLayout>
+                <ManageMembersPage />
+              </AdminLayout>
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/reports"
+        element={
+          <ProtectedRoute user={user}>
+            <AdminRoute isAdmin={isAdmin}>
+              <AdminLayout>
+                <div style={{ padding: '1rem' }}>Reports coming soon…</div>
+              </AdminLayout>
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
 
-          {/* Dashboards */}
-          <Route
-            path="/dashboard"
-            element={
-              <RoleBasedLayout
-                adminComponent={<AdminDashboard />}
-                performerComponent={<PerformerDashboard />}
-                publicComponent={<Home />}
-              />
-            }
-          />
+      {/* Member events alias */}
+      <Route
+        path="/member-events"
+        element={
+          <MemberRoute user={user}>
+            <MembersLayout>
+              <MemberEvents />
+            </MembersLayout>
+          </MemberRoute>
+        }
+      />
 
-          <Route path="/book-us" element={<ClientBooking />} />
-
-          {/* ✅ Admin-only routes */}
-          <Route
-            path="/admin/manage"
-            element={user ? (isAdmin ? <AdminManageMembers /> : <Navigate to="/members" replace />) : <Navigate to="/login" replace />}
-          />
-          <Route
-            path="/admin/reports"
-            element={user ? (isAdmin ? <AdminReports /> : <Navigate to="/members" replace />) : <Navigate to="/login" replace />}
-          />
-        </Routes>
-      </main>
-
-      {!isMemberRoute && <Footer />}
-    </>
+      {/* Fallbacks */}
+      <Route path="/not-authorized" element={<PublicLayout><NotAuthorized /></PublicLayout>} />
+      <Route path="*" element={<PublicLayout><div style={{ padding: '2rem' }}>404 — Page not found</div></PublicLayout>} />
+    </Routes>
   );
 };
 

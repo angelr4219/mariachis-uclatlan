@@ -1,7 +1,9 @@
-
-
+// =============================================
+// FILE: src/components/RSVPButtons.tsx
+// =============================================
 import React from 'react';
 import type { RSVPStatus } from '../types/events';
+import './RSVPButtons.css';
 
 interface Props {
   value?: RSVPStatus;
@@ -9,25 +11,32 @@ interface Props {
   compact?: boolean;
 }
 
-const labels: Record<Exclude<RSVPStatus, 'none'>, string> = {
+const LABELS: Record<RSVPStatus, string> = {
   accepted: 'Accept',
-  tentative: 'Tentative',
+  tentative: 'Tentative',   // UI label, persisted as 'maybe'
   declined: 'Decline',
+  none: 'No Response',
 };
+
+const KEYS: RSVPStatus[] = ['accepted', 'tentative', 'declined', 'none'];
 
 const RSVPButtons: React.FC<Props> = ({ value, onChange, compact }) => {
   return (
     <div className={`rsvp-buttons ${compact ? 'compact' : ''}`}>
-      {(['accepted','tentative','declined'] as const).map(k => (
+      {KEYS.map((k) => (
         <button
           key={k}
-          className={`rsvp-btn ${value===k ? 'active' : ''} ${k}`}
+          className={`rsvp-btn ${value === k ? 'active' : ''} ${k}`}
           onClick={() => onChange(k)}
           type="button"
-        >{labels[k]}</button>
+        >
+          {LABELS[k]}
+        </button>
       ))}
     </div>
   );
 };
 
 export default RSVPButtons;
+
+

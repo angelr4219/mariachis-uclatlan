@@ -1,0 +1,10 @@
+/* src/pages/Public/BookUs.css */
+.bookus { padding: 1rem; }
+.bookus h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: .25rem; }
+.bookus-form { max-width: 560px; background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1rem; box-shadow: 0 2px 10px rgba(2,6,23,.04); }
+.bookus-form input, .bookus-form textarea { width: 100%; margin-top: .5rem; padding: .6rem .7rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: .95rem; }
+.bookus-form textarea { min-height: 90px; resize: vertical; }
+.bookus-form button { margin-top: .75rem; padding: .55rem .85rem; border-radius: 10px; border: 1px solid #e5e7eb; font-weight: 600; cursor: pointer; }
+.ok { margin-top: .5rem; color: #065f46; background: #ecfdf5; border: 1px solid #a7f3d0; padding: .5rem .7rem; border-radius: 8px; }
+.err { margin-top: .5rem; color: #9f1239; background: #fff1f2; border: 1px solid #fecdd3; padding: .5rem .7rem; border-radius: 8px; }
+.hp { position: absolute; left: -9999px; opacity: 0; height: 0; width: 0; }

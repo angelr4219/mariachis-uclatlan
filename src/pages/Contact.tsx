@@ -16,6 +16,7 @@ const Contact: React.FC = () => {
 
       <div className="contact-actions">
         {/* TODO: set these routes/URLs to your real destinations */}
+        <Link to="/hire-us" className="cta-button">hiring</Link>
         <Link to="/book-us" className="cta-button">Performance Inquiry</Link>
         <Link to="/join" className="cta-button">How to Join Our Group</Link>
         <Link to="/contact/form" className="cta-button">General Questions</Link>

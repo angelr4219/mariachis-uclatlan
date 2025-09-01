@@ -1,9 +1,11 @@
 // src/services/events.ts
-import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, setDoc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, setDoc, updateDoc , where, serverTimestamp} from 'firebase/firestore';
 import { db } from '../firebase';
 import type { EventDoc, EventItem, EventStatus } from '../types/events';
 import type { RSVPDoc } from '../types/events'; // re-exported from types/events
 import { normalizeEvent } from '../utils/events';
+import type { RSVPStatus } from '../types/events'; // or from './events' if you re-export it
+
 
 // Optional convenience so legacy imports work: `import { auth } from "../services/events"`
 export { auth } from '../firebase';
@@ -74,26 +76,60 @@ export async function cancelEvent(eventId: string) {
   await updateEvent(eventId, { status: 'cancelled' } as Partial<EventDoc>);
 }
 
-// -----------------
-// RSVP subcollection
-// -----------------
-function rsvpsCol(eventId: string) {
-  return collection(db, EVENTS, eventId, 'rsvps');
-}
 
-export function observeRsvps(eventId: string, onNext: (rows: RSVPDoc[]) => void, onError?: (e: unknown) => void) {
-  return onSnapshot(
-    rsvpsCol(eventId),
-    (snap) => onNext(snap.docs.map((d) => d.data() as RSVPDoc)),
-    (err) => onError?.(err)
-  );
-}
+// =======================
+// RSVP helpers (#4)
+// =======================
 
-export async function getMyRSVP(eventId: string, uid: string): Promise<RSVPDoc | null> {
-  const snap = await getDoc(doc(rsvpsCol(eventId), uid));
-  return snap.exists() ? (snap.data() as RSVPDoc) : null;
-}
+/**
+ * Query events where this performer is assigned.
+ * Requires EventDoc to have: assignedPerformerIds?: string[]
+ */
+export async function fetchAssignedEventsForUser(uid: string): Promise<EventItem[]> {
+    const eventsRef = collection(db, EVENTS);
+    const q = query(eventsRef, where('assignedPerformerIds', 'array-contains', uid), orderBy('start', 'asc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) =>
+      normalizeEvent({ id: d.id, ...(d.data() as Omit<EventDoc, 'id'>) } as EventDoc)
+    );
+  }
+  
+  /**
+   * Write the current user's RSVP under: events/{eventId}/rsvps/{uid}
+   */
+  export async function respondToRSVP(eventId: string, uid: string, status: RSVPStatus): Promise<void> {
+    const rsvpRef = doc(db, EVENTS, eventId, 'rsvps', uid);
+    await setDoc(
+      rsvpRef,
+      { status, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  }
+  
+  // ---- RSVP single-user helpers ----
 
-export async function setRSVP(eventId: string, rsvp: RSVPDoc) {
-  await setDoc(doc(rsvpsCol(eventId), rsvp.uid), { ...rsvp, updatedAt: Date.now() }, { merge: true });
-}
+/**
+ * Read the current user's RSVP for a given event.
+ * Path: events/{eventId}/rsvps/{uid}
+ */
+export async function getMyRSVP(eventId: string, uid: string) {
+    const ref = doc(db, 'events', eventId, 'rsvps', uid);
+    const snap = await getDoc(ref);
+    return snap.exists() ? ({ uid, ...(snap.data() as any) }) : null;
+    }
+    
+    
+    export async function setRSVP(eventId: string, r: { uid: string; status: import('../types/events').RSVPStatus; displayName?: string | null; role?: string | null; }) {
+    const ref = doc(db, 'events', eventId, 'rsvps', r.uid);
+    await setDoc(
+    ref,
+    {
+    uid: r.uid,
+    displayName: r.displayName ?? null,
+    role: r.role ?? null,
+    status: r.status, // 'maybe' is the only tentative-like value we persist
+    updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+    );
+    }

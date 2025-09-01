@@ -1,0 +1,10 @@
+.hireus { max-width: 720px; margin: 0 auto; padding: 1rem; }
+.hireus h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: .5rem; }
+.event-form { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1rem; box-shadow: 0 2px 10px rgba(2,6,23,.04); }
+.event-form h3 { margin-top: .25rem; font-size: 1.1rem; font-weight: 700; }
+.event-form input, .event-form textarea { width: 100%; margin-top: .5rem; padding: .6rem .7rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: .95rem; }
+.event-form textarea { min-height: 90px; resize: vertical; }
+.time-row { display: flex; gap: .5rem; }
+button { margin-top: .75rem; padding: .55rem .85rem; border-radius: 10px; border: 1px solid #e5e7eb; font-weight: 600; cursor: pointer; }
+.ok { margin-top: .5rem; color: #065f46; background: #ecfdf5; border: 1px solid #a7f3d0; padding: .5rem .7rem; border-radius: 8px; }
+.err { margin-top: .5rem; color: #9f1239; background: #fff1f2; border: 1px solid #fecdd3; padding: .5rem .7rem; border-radius: 8px; }

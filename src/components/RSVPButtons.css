@@ -1,0 +1,8 @@
+
+.rsvp-buttons { display: flex; gap: .5rem; }
+.rsvp-buttons.compact .rsvp-btn { padding: .25rem .5rem; font-size: .9rem; }
+.rsvp-btn { border: 1px solid #d1d5db; border-radius: 8px; padding: .4rem .75rem; background: #f9fafb; cursor: pointer; }
+.rsvp-btn.active { outline: 2px solid #2774AE; }
+.rsvp-btn.accepted.active { background: #dcfce7; }
+.rsvp-btn.maybe.active { background: #fef9c3; }
+.rsvp-btn.declined.active { background: #fee2e2; }

@@ -1,20 +1,28 @@
 // src/firebase.ts
-import { initializeApp } from 'firebase/app';
+
+
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions'; // <-- Add this import
 
+var APIKEY = "AIzaSyBTl0Jl9ZMQBA84LBbECwzUz5jcL4dYV3Y"
+var AUTHDOMAIN = "mduwebsite1345.firebaseapp.com"
+var PROJECTID = "mduwebsite1345"
+var STORAGEBUCKET =  "mduwebsite1345.firebasestorage.app"
+var MESSAGINGSENDERID = "653256711691"
+var APPID =  "1:653256711691:web:5aca0f2e84ed19df90710e"
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBTl0Jl9ZMQBA84LBbECwzUz5jcL4dYV3Y",
-  authDomain: "mduwebsite1345.firebaseapp.com",
-  projectId: "mduwebsite1345",
-  storageBucket: "mduwebsite1345.firebasestorage.app",
-  messagingSenderId: "653256711691",
-  appId: "1:653256711691:web:5aca0f2e84ed19df90710e"
+  apiKey: APIKEY,
+  authDomain: AUTHDOMAIN,
+  projectId: PROJECTID,
+  storageBucket: STORAGEBUCKET,
+  messagingSenderId: MESSAGINGSENDERID,
+  appId: APPID
 };
-
-const app = initializeApp(firebaseConfig);
+export const app: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const functions = getFunctions(app); // <-- Export functions here
+export const functions = getFunctions(app); 
+export default app;
