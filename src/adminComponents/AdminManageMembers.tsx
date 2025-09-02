@@ -1,40 +1,28 @@
 // =============================================================
 // FILE: src/adminComponents/AdminManageMembers.tsx
-// Purpose: Fix TS mismatches by (1) unifying on services/users profile type,
-// (2) coercing string[] roles -> Role[], and (3) null-safe fields.
+// Purpose: Pull members from firebase-users using the new hook; fix TS & roles
 // =============================================================
 import React from 'react';
-import { useProfiles } from '../pages/hooks/useProfiles';
-import { updateUserRoles } from '../services/users';
+// ✅ Correct hook path & name (plural Users): from adminComponents -> pages/hooks
+import { useUsersRoster } from '../pages/hooks/useUserRoster';
+// ✅ Correct services path: from adminComponents -> services
+import { updateUserRoles, coerceRoles } from '../services/users';
+
 import RoleBadge from '../pages/admin/RoleBadge';
 import RoleSelect from '../pages/admin/RoleSelect';
-
-// Import Role + primaryRole utilities, but avoid importing UserProfile from ../types/user
-// to prevent cross-module type incompatibilities.
 import { primaryRole, type Role } from '../types/user';
 
-// Derive the profile type from the hook to match its source of truth.
-// This avoids the services vs types/UserProfile name/type collision.
-export type Profile = ReturnType<typeof useProfiles>['profiles'][number];
-
-// Helper: coerce whatever comes from Firestore (string[] | undefined) into Role[]
-function coerceRoles(r?: string[] | Role[] | null): Role[] {
-  if (!r) return [];
-  const asArray = Array.isArray(r) ? r : [r as any];
-  const allowed: Role[] = ['admin', 'performer', 'member'];
-  return asArray
-    .map((x) => (typeof x === 'string' ? x.toLowerCase() : x))
-    .filter((x): x is Role => allowed.includes(x as Role));
-}
+export type Profile = ReturnType<typeof useUsersRoster>['profiles'][number];
 
 const AdminManageMembers: React.FC = () => {
-  const { profiles, loading, error } = useProfiles();
+  const { profiles, loading, error } = useUsersRoster();
   const [search, setSearch] = React.useState('');
 
-  const filtered = React.useMemo(() => {
+  // ✅ Give useMemo a type param so map/filter get Profile, not any
+  const filtered = React.useMemo<Profile[]>(() => {
     const q = search.trim().toLowerCase();
     if (!q) return profiles;
-    return profiles.filter((p) => {
+    return profiles.filter((p: Profile) => {
       const name = (p.name ?? '').toLowerCase();
       const email = (p.email ?? '').toLowerCase();
       const instruments = (p.instruments ?? []).join(', ').toLowerCase();
@@ -64,34 +52,36 @@ const AdminManageMembers: React.FC = () => {
       {loading && <p>Loading members…</p>}
       {error && <p style={{ color: 'salmon' }}>{String(error)}</p>}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ textAlign: 'left' }}>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Instruments</th>
-            <th>Role</th>
-            <th>Change Role</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((p) => {
-            const roles = coerceRoles(p.roles as any); // Firestore often stores string[]
-            const current = primaryRole(roles);
-            return (
-              <tr key={p.uid} style={{ borderTop: '1px solid #eee' }}>
-                <td>{p.name ?? ''}</td>
-                <td>{p.email ?? ''}</td>
-                <td>{(p.instruments ?? []).join(', ')}</td>
-                <td><RoleBadge role={current} /></td>
-                <td>
-                  <RoleSelect value={current} onChange={(r) => setRole(p, r)} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      {!loading && !error && (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ textAlign: 'left' }}>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Instruments</th>
+              <th>Role</th>
+              <th>Change Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((p: Profile) => {
+              const roles = coerceRoles(p.roles as any);
+              const current = primaryRole(roles);
+              return (
+                <tr key={p.uid} style={{ borderTop: '1px solid #eee' }}>
+                  <td>{p.name ?? ''}</td>
+                  <td>{p.email ?? ''}</td>
+                  <td>{(p.instruments ?? []).join(', ')}</td>
+                  <td><RoleBadge role={current} /></td>
+                  <td>
+                    <RoleSelect value={current} onChange={(r) => setRole(p, r)} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </section>
   );
 };

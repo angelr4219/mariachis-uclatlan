@@ -29,6 +29,9 @@ import BookUs from './pages/bookUs';
 import Join from './pages/joinUs';
 import HireUs from './pages/HireUs';
 
+
+// --- NEW: import the report page ---
+import ParticipationReport from './components/ParticipationReport';
 // Admin-only utilities
 import ProtectedRoute from './routes/ProtectedRoute';
 import AdminRoute from './routes/AdminRoute';
@@ -124,6 +127,18 @@ const App: React.FC = () => {
                 </AdminRoute>
               </ProtectedRoute>
             }
+          />
+          <Route
+          path="/admin/participation"
+          element={
+          <ProtectedRoute user={user}>
+          <AdminRoute isAdmin={isAdmin}>
+          <AdminLayout>
+          <ParticipationReport />
+          </AdminLayout>
+          </AdminRoute>
+          </ProtectedRoute>
+          }
           />
 
           <Route
