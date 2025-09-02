@@ -1,0 +1,17 @@
+
+.admin-inquiries { max-width: 1000px; margin: 0 auto; padding: 1rem; }
+.inq-list { display: grid; gap: 1rem; }
+.inq-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; }
+.inq-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.muted { color: #6b7280; font-size: .9rem; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .75rem 1rem; margin: .75rem 0; }
+.grid dt { font-size: .75rem; color: #6b7280; }
+.grid dd { margin: 0; }
+.grid .span-2 { grid-column: span 2; }
+.actions { display: flex; gap: .5rem; justify-content: flex-end; }
+.btn { background: #2774AE; color: #fff; border: 0; padding: .5rem .8rem; border-radius: 8px; cursor: pointer; }
+.btn-light { background: #e5e7eb; color: #374151; }
+.chip { font-size: .75rem; padding: .15rem .5rem; border-radius: 999px; background: #e5e7eb; color: #374151; text-transform: capitalize; }
+.chip.new { background: #FEF3C7; color: #92400E; }
+.chip.in_progress { background: #DBEAFE; color: #1E40AF; }
+.chip.closed { background: #E5E7EB; color: #374151; }

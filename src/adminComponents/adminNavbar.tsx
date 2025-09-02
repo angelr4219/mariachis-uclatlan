@@ -26,6 +26,14 @@ const AdminNavbar: React.FC = () => {
             Dashboard
           </NavLink>
         </li>
+
+
+        <li>
+  <NavLink to="/admin/inquiries" className={({ isActive }) => (isActive ? 'active' : '')}>
+    Requests
+  </NavLink>
+</li>
+
         <li>
   <NavLink to="/admin/participation" className={({ isActive }) => isActive ? 'active' : ''}>
     Participation

@@ -29,6 +29,9 @@ import BookUs from './pages/bookUs';
 import Join from './pages/joinUs';
 import HireUs from './pages/HireUs';
 
+import AdminInquiries from './adminComponents/AdminInquiries'; // + add import
+
+
 
 // --- NEW: import the report page ---
 import ParticipationReport from './components/ParticipationReport';
@@ -141,6 +144,18 @@ const App: React.FC = () => {
           }
           />
 
+        <Route
+          path="/admin/inquiries"
+          element={
+            <ProtectedRoute user={user}>
+              <AdminRoute isAdmin={isAdmin}>
+                <AdminLayout>
+                  <AdminInquiries />
+                </AdminLayout>
+              </AdminRoute>
+            </ProtectedRoute>
+          }
+        />
           <Route
             path="/admin/events"
             element={
