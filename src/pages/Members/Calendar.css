@@ -1,0 +1,45 @@
+
+/* Bigger modal + bigger calendar buttons */
+:root {
+  --calendar-font-base: 20px; /* bump global size on this page */
+}
+
+.calendar-root { font-size: var(--calendar-font-base); }
+
+.calendar-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: grid; place-items: center; z-index: 1000;
+}
+
+.calendar-modal {
+  background: #fff; padding: 1.75rem 2rem; border-radius: 16px;
+  width: min(760px, calc(100% - 2rem));
+  box-shadow: 0 14px 36px rgba(0,0,0,0.22);
+  font-size: 1.2rem; line-height: 1.65;
+}
+.calendar-modal h3 { margin: 0 0 .6rem; font-size: 1.9rem; }
+.calendar-meta { font-size: 1.15rem; color: #333; }
+.calendar-actions { display: flex; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+
+/* BIGGER primary/secondary buttons used in the modal */
+.calendar-btn {
+  padding: 0.95rem 1.25rem; border-radius: 12px; border: 1px solid #2774AE;
+  background: #2774AE; color: #fff; text-decoration: none; font-weight: 700; font-size: 1.12rem;
+  min-height: 46px;
+}
+.calendar-btn.secondary { background: transparent; color: #2774AE; }
+
+/* Optional XL modifier if you want to upsize even more on specific buttons */
+.calendar-btn--xl { padding: 1.1rem 1.4rem; font-size: 1.22rem; border-radius: 14px; min-height: 52px; }
+
+@media (min-width: 900px) {
+  .calendar-modal { padding: 2rem 2.25rem; font-size: 1.28rem; }
+  .calendar-modal h3 { font-size: 2rem; }
+  .calendar-btn { font-size: 1.16rem; padding: 1rem 1.35rem; }
+}
+
+/* FullCalendar size bumps (harmless if CalendarApp isn't FullCalendar) */
+.fc .fc-toolbar-title { font-size: 1.9rem; }
+.fc .fc-button { font-size: 1.05rem; padding: 0.7rem 1rem; min-height: 44px; line-height: 1.2; }
+.fc .fc-button-primary { border-radius: 10px; }
+.fc .fc-daygrid-day-number, .fc .fc-col-header-cell-cushion { font-size: 1.15rem; }

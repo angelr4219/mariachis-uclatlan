@@ -1,4 +1,6 @@
-// src/components/RSVPPanel.tsx
+// =============================================
+// FILE: src/components/RSVPPanel.tsx
+// =============================================
 import React, { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -9,14 +11,19 @@ import RSVPButtons from './RSVPButtons';
 import './RSVPPanel.css';
 
 export default function RSVPPanel({ event }: { event: EventItem }) {
-  const [uid, setUid] = useState<string | null>(null);
+  const [uid, setUid] = useState<string | undefined>(undefined);
   const [mine, setMine] = useState<RSVPDoc | null>(null);
   const [loading, setLoading] = useState(true);
   const disabled = event.status !== 'published';
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { setUid(null); setMine(null); setLoading(false); return; }
+      if (!u) {
+        setUid(undefined);
+        setMine(null);
+        setLoading(false);
+        return;
+      }
       setUid(u.uid);
       setLoading(true);
       const r = await getMyRSVP(event.id, u.uid);
@@ -28,15 +35,12 @@ export default function RSVPPanel({ event }: { event: EventItem }) {
 
   const handleChange = async (next: RSVPStatus) => {
     if (!uid) return;
-
     const r: RSVPDoc = {
       uid,
-      status: next,                // 'accepted' | 'maybe' | 'declined'
+      role: mine?.role ?? undefined, // ✅ use undefined instead of null
+      status: next,
       updatedAt: Date.now(),
-      ...(mine?.role ? { role: mine.role } : {}),                // ✅ no nulls
-      ...(mine?.displayName ? { displayName: mine.displayName } : {}), // ✅ if your type includes it
     };
-
     await setRSVP(event.id, r);
     setMine(r);
   };

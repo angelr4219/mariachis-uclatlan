@@ -1,43 +1,32 @@
-// ================================
-// FILE: src/pages/HireUs.tsx
-// Desc: Client booking form with richer error display + basic validation
-// ================================
+
+// =============================================
+// FILE: src/pages/public/HireUs.tsx (updated)
+// =============================================
 import React, { useState } from 'react';
 import { useRecaptcha } from './hooks/useRecaptcha';
 import { submitClientRequest } from '../services/publicClient';
+import { createInquiry } from '../services/inquiries';
 import './HireUs.css';
 
-const HireUs: React.FC = () => {
+export default function HireUs() {
   const [form, setForm] = useState({
     name: '', email: '', phone: '', org: '',
     title: '', date: '', startTime: '', endTime: '', location: '', details: ''
   });
   const [ok, setOk] = useState<string>('');
   const [err, setErr] = useState<string>('');
-  const [debug, setDebug] = useState<string>(''); // shows server details if available
   const { execute } = useRecaptcha();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setOk(''); setErr(''); setDebug('');
+    setOk(''); setErr('');
     try {
-      // Basic front-end guardrails
-      if (!form.email || !form.name) {
-        setErr('Please enter your name and email.');
-        return;
-      }
-
       const token = await execute('client_booking');
-      if (!token) {
-        setErr('reCAPTCHA could not be verified. Please refresh and try again.');
-        return;
-      }
-
       const startIso = form.date && form.startTime ? new Date(`${form.date}T${form.startTime}`).toISOString() : undefined;
       const endIso = form.date && form.endTime ? new Date(`${form.date}T${form.endTime}`).toISOString() : undefined;
 
-      const res = await submitClientRequest({
-        recaptchaToken: token,
+      // Build a single payload we can reuse for both Apps Script + Firestore
+      const basePayload = {
         name: form.name,
         email: form.email,
         phone: form.phone || undefined,
@@ -49,27 +38,27 @@ const HireUs: React.FC = () => {
           start: startIso,
           end: endIso,
           location: form.location || undefined,
+        },
+        meta: {
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }
-      });
+      } as const;
 
-      // If service returns a JSON object with status/message, handle it
-      if ((res as any)?.error || (res as any)?.status === 'error') {
-        const serverMsg = (res as any)?.message || (res as any)?.error || 'Server reported an error';
-        setErr(serverMsg);
-        setDebug(JSON.stringify(res, null, 2));
-        return;
-      }
+      // Kick off both the email/Apps Script call and the Firestore write
+      await Promise.all([
+        submitClientRequest({
+          recaptchaToken: token,
+          ...basePayload,
+        } as any),
+        createInquiry(basePayload),
+      ]);
 
       setOk("Thanks! Your request was received. We'll reach out soon.");
       setForm({ name:'', email:'', phone:'', org:'', title:'', date:'', startTime:'', endTime:'', location:'', details:'' });
     } catch (e: any) {
-      // Show as much detail as is safe for debugging
-      const msg = e?.message || 'Failed to send';
-      setErr(msg);
-      if (e?.responseJson) setDebug(JSON.stringify(e.responseJson, null, 2));
-      else if (e?.responseText) setDebug(String(e.responseText));
-      else if (e?.stack) setDebug(String(e.stack));
-      else setDebug(JSON.stringify(e, null, 2));
+      console.error('[HireUs submit] ', e);
+      setErr(e?.message || 'Failed to send');
     }
   }
 
@@ -94,71 +83,9 @@ const HireUs: React.FC = () => {
         <textarea placeholder="Details / repertoire / special notes" value={form.details} onChange={e=>setForm(f=>({...f,details:e.target.value}))} />
 
         <button type="submit">Submit request</button>
-        {ok && <p className="ok" role="status">{ok}</p>}
-        {err && <p className="err" role="alert">{err}</p>}
-        {/* Debug section only shows when there's an error */}
-        {err && debug && (
-          <pre className="debug-blame" aria-live="polite">{debug}</pre>
-        )}
+        {ok && <p className="ok">{ok}</p>}
+        {err && <p className="err">{err}</p>}
       </form>
     </div>
   );
-};
-
-export default HireUs;
-
-
-// ================================
-// FILE: src/services/publicClient.ts
-// Desc: Thin client for Apps Script / Cloud Function endpoint + strong error reporting
-// ================================
-export type ClientRequestPayload = {
-  recaptchaToken: string;
-  name: string;
-  email: string;
-  phone?: string;
-  org?: string;
-  message?: string;
-  event?: {
-    title?: string;
-    date?: string;
-    start?: string; // ISO
-    end?: string;   // ISO
-    location?: string;
-  };
-};
-
-const BASE_URL = import.meta.env.VITE_APPS_SCRIPT_URL; // must be defined
-
-export async function submitClientRequest(payload: ClientRequestPayload): Promise<any> {
-  if (!BASE_URL) {
-    const e = new Error('Missing VITE_APPS_SCRIPT_URL environment variable.');
-    (e as any).hint = 'Set VITE_APPS_SCRIPT_URL in your .env and restart dev server.';
-    throw e;
-  }
-
-  const res = await fetch(`${BASE_URL}/clientRequest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    // credentials not typically needed for Apps Script; add if your backend requires
-  });
-
-  const text = await res.text();
-  let json: any = null;
-  try { json = text ? JSON.parse(text) : null; } catch {
-    // leave json as null; backend might return plain text
-  }
-
-  if (!res.ok) {
-    const err = new Error(json?.message || json?.error || `${res.status} ${res.statusText}`);
-    (err as any).responseText = text;
-    (err as any).responseJson = json;
-    (err as any).status = res.status;
-    throw err;
-  }
-
-  // Success path: return parsed JSON (or raw text fallback)
-  return json ?? { ok: true, raw: text };
 }
-

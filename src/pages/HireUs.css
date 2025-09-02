@@ -1,20 +1,11 @@
 
-.hireus {
-  max-width: 720px;
-  margin: 2rem auto;
-  padding: 2rem;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-}
-
-.event-form { display: flex; flex-direction: column; gap: 1rem; }
-.event-form input, .event-form textarea {
-  padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem;
-}
+.hireus { max-width: 720px; margin: 2rem auto; padding: 1rem; }
+.event-form { display: grid; gap: 0.75rem; }
+.event-form h3 { margin-top: 1rem; margin-bottom: 0.25rem; }
+.event-form input, .event-form textarea { padding: 0.6rem 0.75rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.95rem; }
 .event-form textarea { min-height: 120px; resize: vertical; }
-.time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-button[type="submit"] { background: #2774AE; color: #fff; border: 0; padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; }
-.ok { color: #065f46; background: #ecfdf5; padding: 0.5rem 0.75rem; border-radius: 6px; }
-.err { color: #991b1b; background: #fee2e2; padding: 0.5rem 0.75rem; border-radius: 6px; }
-.debug-blame { white-space: pre-wrap; background: #0b1020; color: #d1d5db; padding: 0.75rem; border-radius: 8px; font-size: 0.85rem; overflow-x: auto; }
+.time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.event-form button { padding: 0.7rem 1rem; border-radius: 10px; border: none; background: #005587; color: #fff; font-weight: 600; cursor: pointer; }
+.event-form button:hover { filter: brightness(1.05); }
+.ok { color: #065f46; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 0.5rem 0.75rem; border-radius: 8px; }
+.err { color: #991b1b; background: #fee2e2; border: 1px solid #fecaca; padding: 0.5rem 0.75rem; border-radius: 8px; }

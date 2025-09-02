@@ -1,66 +1,63 @@
-// src/hooks/useProfiles.ts — corrected import paths + small polish
-import { useEffect, useState } from 'react';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { db } from '../../firebase'; 
-import type { UserProfile } from '../../types/user'; 
+// =============================================
+// FILE: src/pages/hooks/useProfiles.tsx
+// Description: Load roster from Firestore (/profiles) with safe defaults
+// =============================================
+import React from 'react';
+import { collection, getDocs, type CollectionReference } from 'firebase/firestore';
+import { db } from '../../firebase';
+import type { UserProfile } from '../../services/profile';
 
-/**
- * Subscribes to user profiles. Primary: `profiles` (ordered by name).
- * If empty or missing (legacy), falls back to `users`.
- */
+const DEFAULT_PROFILE: Omit<UserProfile, 'uid' | 'email'> = {
+  name: '',
+  phoneNumber: '',
+  year: '',
+  major: '',
+  instrument: '',
+  instruments: [],
+  section: '',
+  bio: '',
+  roles: ['performer'],
+  returning: '',
+  emergencyName: '',
+  emergencyPhone: '',
+  emergencyRelation: '',
+  photoURL: '',
+};
+
 export function useProfiles() {
-  const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [profiles, setProfiles] = React.useState<UserProfile[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  useEffect(() => {
-    let unsubPrimary: (() => void) | null = null;
-    let unsubFallback: (() => void) | null = null;
-
-    try {
-      const qPrimary = query(collection(db, 'profiles'), orderBy('name'));
-      unsubPrimary = onSnapshot(
-        qPrimary,
-        (snap) => {
-          const rows = snap.docs.map((d) => ({ uid: d.id, ...(d.data() as any) }));
-          if (rows.length > 0) {
-            setProfiles(rows as UserProfile[]);
-            setLoading(false);
-          } else {
-            // Fallback to legacy `users` collection
-            const qFallback = query(collection(db, 'users'));
-            unsubFallback = onSnapshot(
-              qFallback,
-              (s2) => {
-                const rows2 = s2.docs.map((d) => ({ uid: d.id, ...(d.data() as any) }));
-                setProfiles(rows2 as UserProfile[]);
-                setLoading(false);
-              },
-              (err) => {
-                console.error('[useProfiles fallback]', err);
-                setError(err.message || 'Failed to load profiles');
-                setLoading(false);
-              }
-            );
-          }
-        },
-        (err) => {
-          console.error('[useProfiles primary]', err);
-          setError(err.message || 'Failed to load profiles');
-          setLoading(false);
-        }
-      );
-    } catch (err: any) {
-      console.error('[useProfiles setup]', err);
-      setError(err.message || 'Failed to subscribe');
-      setLoading(false);
-    }
-
-    return () => {
-      try { unsubPrimary && unsubPrimary(); } catch {}
-      try { unsubFallback && unsubFallback(); } catch {}
+  React.useEffect(() => {
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // NOTE: we store profiles under /profiles/{uid}
+        const snap = await getDocs(collection(db, 'profiles') as CollectionReference);
+        const rows = snap.docs.map((d) => {
+          const data = d.data() as Partial<UserProfile>;
+          return {
+            uid: d.id,
+            email: data.email ?? '',
+            ...DEFAULT_PROFILE,
+            ...data,
+            // normalize roles/instruments in case an old doc is weird
+            roles: Array.isArray(data.roles) && data.roles.length ? data.roles : ['performer'],
+            instruments: Array.isArray(data.instruments) ? data.instruments : [],
+          } as UserProfile;
+        });
+        setProfiles(rows);
+      } catch (e: any) {
+        console.error('[useProfiles] load failed:', e);
+        setError(e?.message || 'Failed to load profiles');
+      } finally {
+        setLoading(false);
+      }
     };
+    run();
   }, []);
 
-  return { profiles, loading, error };
+  return { profiles, loading, error } as const;
 }

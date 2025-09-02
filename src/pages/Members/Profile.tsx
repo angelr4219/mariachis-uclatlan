@@ -1,14 +1,13 @@
-
 // =============================================
-// FILE: src/pages/Members/Profile.tsx  (REPLACE EXISTING)
+// FILE: src/pages/Members/Profile.tsx
 // Description: Member profile page using services/profile.ts + Storage avatar upload
 // =============================================
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './Profile.css';
 import { auth, storage } from '../../firebase';
 import { updateProfile as updateAuthProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { UserProfile, AppRole } from '../../services/profile';
+import type { UserProfile } from '../../services/profile';
 import { getProfile, upsertProfile } from '../../services/profile';
 
 const emptyProfile = (uid: string, email: string | null): UserProfile => ({
@@ -22,7 +21,7 @@ const emptyProfile = (uid: string, email: string | null): UserProfile => ({
   instruments: [],
   section: '',
   bio: '',
-  roles: ['performer'], // default
+  roles: ['performer'],
   returning: '',
   emergencyName: '',
   emergencyPhone: '',
@@ -31,7 +30,7 @@ const emptyProfile = (uid: string, email: string | null): UserProfile => ({
 });
 
 const Profile: React.FC = () => {
-  const user = auth.currentUser; // upstream ProtectedRoute/MemberRoute ensures this exists
+  const user = auth.currentUser; // Member route should ensure auth, but this can be briefly null at first render
   const uid = user?.uid ?? '';
 
   const [loading, setLoading] = useState(true);
@@ -45,7 +44,7 @@ const Profile: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (!uid) return;
+      if (!uid) { setLoading(false); return; } // guard if auth not ready yet
       setLoading(true);
       try {
         const found = await getProfile(uid);
@@ -53,6 +52,7 @@ const Profile: React.FC = () => {
         if (mounted) setP(seed);
         if (!found) await upsertProfile(uid, seed); // seed doc on first visit
       } catch (e: any) {
+        console.error('[Profile load]', e);
         setError(e?.message ?? 'Failed to load profile');
       } finally {
         if (mounted) setLoading(false);
@@ -72,15 +72,14 @@ const Profile: React.FC = () => {
     setAvatarFile(file);
   };
 
-  // replace the upload path in uploadAvatarIfNeeded()
-const uploadAvatarIfNeeded = async (): Promise<string | undefined> => {
-  if (!avatarFile || !uid) return undefined;
-  const ext = avatarFile.name.split('.').pop() || 'jpg';
-  // Use a per-user folder so Storage rules can enforce ownership
-  const objectRef = ref(storage, `avatars/${uid}/avatar.${ext}`);
-  await uploadBytes(objectRef, avatarFile);
-  const url = await getDownloadURL(objectRef);
-  return url;
+  const uploadAvatarIfNeeded = async (): Promise<string | undefined> => {
+    if (!avatarFile || !uid) return undefined;
+    const ext = avatarFile.name.split('.').pop() || 'jpg';
+    // per-user folder so Storage rules can enforce ownership
+    const objectRef = ref(storage, `avatars/${uid}/avatar.${ext}`);
+    await uploadBytes(objectRef, avatarFile);
+    const url = await getDownloadURL(objectRef);
+    return url;
   };
 
   const onSave = async () => {
@@ -93,7 +92,7 @@ const uploadAvatarIfNeeded = async (): Promise<string | undefined> => {
 
       // 2) Normalize instruments (comma-separated input to array)
       const csv = (p as any)._instrumentsCSV as string | undefined;
-      const instruments = csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : p.instruments;
+      const instruments = csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : (p.instruments || []);
 
       // 3) Build payload
       const payload: Partial<UserProfile> = {
@@ -112,9 +111,9 @@ const uploadAvatarIfNeeded = async (): Promise<string | undefined> => {
       });
 
       setEditMode(false);
-      if (avatarURL) setP({ ...p, photoURL: avatarURL, instruments });
+      setP({ ...p, instruments, ...(avatarURL ? { photoURL: avatarURL } : {}) });
     } catch (e: any) {
-      console.error('[Profile save] ', e);
+      console.error('[Profile save]', e);
       setError(e?.message ?? 'Failed to save profile');
     } finally {
       setSaving(false);
@@ -279,5 +278,3 @@ const uploadAvatarIfNeeded = async (): Promise<string | undefined> => {
 };
 
 export default Profile;
-
-

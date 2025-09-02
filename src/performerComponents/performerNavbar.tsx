@@ -1,25 +1,30 @@
-// src/components/PerformerNavbar.tsx
+// =============================================
+// FILE: src/components/PerformerNavbar.tsx
+// Description: Performer navbar with proper member routes + active link styles
+// =============================================
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import './performerNavbar.css';
 
 
 const PerformerNavbar: React.FC = () => {
-  return (
-    <nav className="member-navbar">
-      <div className="member-brand">Performer Portal</div>
-      <ul className="member-links">
-        <li><Link to="/dashboard">Dashboard</Link></li>
-        <li><Link to="/members/profile">Profile</Link></li>
-        <li><Link to="/members/events">Events</Link></li>
-        <li><Link to="/members/calendar">Calendar</Link></li> {/* New calendar route */}
-        <li><Link to="/members/performer-availability">Availability</Link></li>
-        <li><Link to="/members/resources">Resources</Link></li>
-        <li><Link to="/members/settings">Settings</Link></li>
-        <li><Link to="/">Public Site</Link></li>
-      </ul>
-    </nav>
-  );
+const cls = ({ isActive }: { isActive: boolean }) => (isActive ? 'active' : undefined);
+return (
+<nav className="member-navbar">
+<div className="member-brand">Performer Portal</div>
+<ul className="member-links">
+<li><NavLink to="/dashboard" className={cls}>Dashboard</NavLink></li>
+<li><NavLink to="/members/profile" className={cls}>Profile</NavLink></li>
+<li><NavLink to="/members/events" className={cls}>Events</NavLink></li>
+<li><NavLink to="/members/calendar" className={cls}>Calendar</NavLink></li>
+<li><NavLink to="/members/performer-availability" className={cls}>Availability</NavLink></li>
+<li><NavLink to="/members/resources" className={cls}>Resources</NavLink></li>
+<li><NavLink to="/members/settings" className={cls}>Settings</NavLink></li>
+<li><NavLink to="/" className={cls}>Public Site</NavLink></li>
+</ul>
+</nav>
+);
 };
+
 
 export default PerformerNavbar;

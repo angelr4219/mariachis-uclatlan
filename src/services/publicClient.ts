@@ -1,56 +1,89 @@
 
+// =============================================
+// FILE: src/services/publicClient.tsx
+// Description: Submit client booking/inquiry to Firestore (and optional Apps Script webhook)
+// Collections used: clients (primary). Optionally creates a lightweight events draft.
+// =============================================
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
-// ================================
-// FILE: src/services/publicClient.ts
-// Desc: Thin client for Apps Script / Cloud Function endpoint + strong error reporting
-// ================================
-export type ClientRequestPayload = {
-  recaptchaToken: string;
+type EventLite = {
+  title?: string;
+  date?: string; // YYYY-MM-DD
+  start?: string | undefined; // ISO
+  end?: string | undefined;   // ISO
+  location?: string;
+};
+
+export type ClientRequest = {
+  recaptchaToken?: string;
   name: string;
   email: string;
   phone?: string;
   org?: string;
   message?: string;
-  event?: {
-    title?: string;
-    date?: string;
-    start?: string; // ISO
-    end?: string;   // ISO
-    location?: string;
-  };
+  event?: EventLite;
 };
 
-const BASE_URL = import.meta.env.VITE_APPS_SCRIPT_URL; // must be defined
-
-export async function submitClientRequest(payload: ClientRequestPayload): Promise<any> {
-  if (!BASE_URL) {
-    const e = new Error('Missing VITE_APPS_SCRIPT_URL environment variable.');
-    (e as any).hint = 'Set VITE_APPS_SCRIPT_URL in your .env and restart dev server.';
-    throw e;
+export async function submitClientRequest(payload: ClientRequest): Promise<{ id: string }> {
+  // minimal frontend validation
+  if (!payload?.name || !payload?.email) {
+    throw new Error('Name and email are required');
   }
 
-  const res = await fetch(`${BASE_URL}/clientRequest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    // credentials not typically needed for Apps Script; add if your backend requires
-  });
+  const docBody = {
+    type: 'client_request',
+    name: payload.name,
+    email: payload.email,
+    phone: payload.phone ?? null,
+    org: payload.org ?? null,
+    message: payload.message ?? null,
+    event: payload.event ?? null,
+    recaptchaToken: payload.recaptchaToken ?? null,
+    status: 'new', // new | triaged | scheduled | closed
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
 
-  const text = await res.text();
-  let json: any = null;
-  try { json = text ? JSON.parse(text) : null; } catch {
-    // leave json as null; backend might return plain text
+  // Primary write: /clients
+  const ref = await addDoc(collection(db, 'clients'), docBody);
+
+  // Optional: create a light draft in /events for admins to see in calendars
+  try {
+    if (payload.event && (payload.event.title || payload.event.date)) {
+      await addDoc(collection(db, 'events'), {
+        title: payload.event.title || 'Client Inquiry',
+        date: payload.event.date ?? null,
+        start: payload.event.start ?? null,
+        end: payload.event.end ?? null,
+        location: payload.event.location ?? null,
+        status: 'inquiry', // distinguish from published events
+        visibility: 'private',
+        source: 'client_form',
+        clientRef: ref.path,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (e) {
+    // Non-fatal; continue even if event draft fails
+    console.warn('[submitClientRequest] event draft create failed:', e);
   }
 
-  if (!res.ok) {
-    const err = new Error(json?.message || json?.error || `${res.status} ${res.statusText}`);
-    (err as any).responseText = text;
-    (err as any).responseJson = json;
-    (err as any).status = res.status;
-    throw err;
+  // Optional: Forward to Apps Script webhook if configured
+  const url = (import.meta as any).env?.VITE_APPS_SCRIPT_URL as string | undefined;
+  if (url) {
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...docBody, firestoreId: ref.id }),
+      });
+    } catch (e) {
+      console.warn('[submitClientRequest] webhook failed:', e);
+    }
   }
 
-  // Success path: return parsed JSON (or raw text fallback)
-  return json ?? { ok: true, raw: text };
+  return { id: ref.id };
 }
 

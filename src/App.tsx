@@ -1,5 +1,5 @@
 // ===============================
-// FILE: src/App.tsx
+// FILE: src/App.tsx (updated)
 // ===============================
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -14,23 +14,20 @@ import MembersEvents from './pages/Members/Events';
 import MembersResources from './pages/Members/Resources';
 import MembersSettings from './pages/Members/Settings';
 import PerformerAvailability from './pages/Members/PerformerAvailability';
-import ManageMembersPage from './pages/ManageMembers';
 import AdminDashboard from './adminComponents/adminDashboard';
 import PerformerDashboard from './performerComponents/PerformerDashboard';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import MembersNavbar from './components/MembersNavbar';
-import AdminNavbar from './adminComponents/adminNavbar';
-import PerformerNavbar from './performerComponents/performerNavbar.tsx';
+import AdminNavbar from './adminComponents/adminNavbar'; // ← unified to components path
+import PerformerNavbar from './performerComponents/performerNavbar';
 import Calendar from './pages/Members/Calendar';
 import RoleBasedLayout from './rolebasedlayout/rbl';
 import { onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
 import { auth } from './firebase';
 import BookUs from './pages/bookUs';
 import Join from './pages/joinUs';
-import HireUs from './pages/HireUs'; // add this import
-
-
+import HireUs from './pages/HireUs';
 
 // Admin-only utilities
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -38,6 +35,7 @@ import AdminRoute from './routes/AdminRoute';
 import { isAdminEmail } from './config/roles';
 import AdminLayout from './layouts/AdminLayout';
 import AdminEvents from './pages/admin/AdminEvents';
+import AdminManageMembers from './adminComponents/AdminManageMembers'; // ← new import
 
 const App: React.FC = () => {
   const [user, setUser] = React.useState<any>(null);
@@ -88,7 +86,6 @@ const App: React.FC = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/book-us" element={<BookUs />} />
-          
           <Route path="/hire-us" element={<HireUs />} />
           <Route path="/join" element={<Join />} />
 
@@ -99,7 +96,6 @@ const App: React.FC = () => {
           <Route path="/members/resources" element={user ? <MembersResources /> : <Navigate to="/login" replace />} />
           <Route path="/members/settings" element={user ? <MembersSettings /> : <Navigate to="/login" replace />} />
           <Route path="/members/performer-availability" element={user ? <PerformerAvailability /> : <Navigate to="/login" replace />} />
-          <Route path="/members/manage" element={user ? <ManageMembersPage /> : <Navigate to="/login" replace />} />
           <Route path="/members/calendar" element={<Calendar />} />
 
           {/* Role-Based Layout */}
@@ -143,13 +139,14 @@ const App: React.FC = () => {
             }
           />
 
+          {/* NEW: Admin Manage Members */}
           <Route
-            path="/admin/manage"
+            path="/admin/managemembers"
             element={
               <ProtectedRoute user={user}>
                 <AdminRoute isAdmin={isAdmin}>
                   <AdminLayout>
-                    <ManageMembersPage />
+                    <AdminManageMembers />
                   </AdminLayout>
                 </AdminRoute>
               </ProtectedRoute>
@@ -197,3 +194,4 @@ const AppWrapper: React.FC = () => {
 };
 
 export default AppWrapper;
+

@@ -1,69 +1,105 @@
+// FILE: firestore.rules
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() { return request.auth != null; }
-
-    function isAdmin() {
-      return (request.auth.token.admin == true)
-        ||
-        (
-          request.auth != null &&
-          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
-        );
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Users (profiles)
+    // users/{uid} document contains roles: ["admin", ...]
+    function isAdmin() {
+      return isSignedIn() &&
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
+               .hasAny(['admin']));
+    }
+
+    // Safely check array membership (works if roles is missing/null)
+    function rolesHas(role) {
+      return isSignedIn() &&
+             role in (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
+                      || []);
+    }
+
+    // ---------- users ----------
     match /users/{uid} {
-      // Only owner can read their doc
-      allow read: if isSignedIn() && request.auth.uid == uid;
+      // Anyone signed in can read basic profiles (loosen/tighten as you prefer)
+      allow read: if isSignedIn();
+      // Only the owner can write their own profile (or admin)
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+    }
 
-      // Owner can create/update their profile, but cannot set admin flag
-      allow create: if isSignedIn() && request.auth.uid == uid
-        && !('isAdmin' in request.resource.data.keys());
+    // ---------- events ----------
+    match /events/{eventId} {
+      // Allow listing/reading only if event is published (or admin).
+      // IMPORTANT: For queries you must include where('status','==','published'),
+      // otherwise reads will be denied.
+      allow get, list: if isAdmin() || (resource.data.status == 'published');
 
-      allow update: if isSignedIn() && request.auth.uid == uid
-        && !('isAdmin' in request.resource.data.diff(resource.data).changedKeys());
+      // Admin manages events
+      allow create, update, delete: if isAdmin();
 
-      // Optional: allow admins to write anyone's user doc (e.g., to grant roles)
+      // ---------- availability subcollection ----------
+      match /availability/{uid} {
+        // Owners can read/write their own availability; admins can read all.
+        allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+        allow write: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+      }
+    }
+
+    // (Optional) top-level availability fallback used by your AdminReports fallback:
+    match /availability/{docId} {
+      // Admin-only by default; performers write only under events/{id}/availability/{uid}
+      allow read: if isAdmin();
       allow write: if isAdmin();
     }
+    // ---------- inquiries ----------
+// Public can CREATE an inquiry (no auth required), but only admins can read or modify.
+match /inquiries/{inquiryId} {
+  allow create: if
+    // required
+    request.resource.data.name is string &&
+    request.resource.data.email is string &&
 
-    // Clients/inquiries (public forms)
-    match /clients/{id} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
-    }
+    // optional top-level strings
+    (!('phone' in request.resource.data) || request.resource.data.phone is string) &&
+    (!('org' in request.resource.data) || request.resource.data.org is string) &&
+    (!('message' in request.resource.data) || request.resource.data.message is string) &&
 
-    match /inquiries/{id} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
-    }
+    // optional nested event map
+    (!('event' in request.resource.data) ||
+      (request.resource.data.event is map &&
+       (!('title' in request.resource.data.event) || request.resource.data.event.title is string) &&
+       (!('date' in request.resource.data.event) || request.resource.data.event.date is string) &&
+       (!('start' in request.resource.data.event) || request.resource.data.event.start is string) &&
+       (!('end' in request.resource.data.event) || request.resource.data.event.end is string) &&
+       (!('location' in request.resource.data.event) || request.resource.data.event.location is string)
+      )
+    ) &&
 
-    // Events
-    match /events/{id} {
-      // Public read (you can tighten if you want)
-      allow get, list: if true;
+    // optional meta map (allow simple strings only)
+    (!('meta' in request.resource.data) ||
+      (request.resource.data.meta is map &&
+       request.resource.data.meta.keys().hasOnly(['userAgent', 'tz']) &&
+       (!('userAgent' in request.resource.data.meta) || request.resource.data.meta.userAgent is string) &&
+       (!('tz' in request.resource.data.meta) || request.resource.data.meta.tz is string)
+      )
+    ) &&
 
-      // Only admins can manage
-      allow create, update, delete: if isAdmin();
-    }
+    // optional serverManaged fields
+    (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp) &&
+    (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
 
-    // RSVPs
-    match /rsvps/{rid} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow delete: if isAdmin();
-    }
-  }
-  match /databases/{database}/documents {
-// Public read rules for other collections go here if needed
+    // restrict status if client sets it
+    (!('status' in request.resource.data) || request.resource.data.status in ['new','in_progress','closed']) &&
 
+    // simple size guards
+    request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200 &&
+    request.resource.data.email.size() > 0 && request.resource.data.email.size() <= 320 &&
+    (!('message' in request.resource.data) || request.resource.data.message.size() <= 5000);
 
-match /profiles/{userId} {
-allow read: if request.auth != null && (
-request.auth.uid == userId || request.auth.token.admin == true
-);
+  allow get, list, update, delete: if isAdmin();
 }
+
+  }
 }
