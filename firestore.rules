@@ -9,10 +9,11 @@ service cloud.firestore {
 
     // users/{uid} document contains roles: ["admin", ...]
     function isAdmin() {
-      return isSignedIn() &&
-             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
-               .hasAny(['admin']));
-    }
+  return isSignedIn()
+    && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+    && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles is list)
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+}
 
     // Safely check array membership (works if roles is missing/null)
     function rolesHas(role) {
