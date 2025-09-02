@@ -55,12 +55,21 @@ export function observeEvent(eventId: string, onNext: (event: EventItem | null) 
 // -----------------
 // Create / Update
 // -----------------
-export async function createEvent(payload: Omit<EventDoc, 'id' | 'createdAt' | 'updatedAt' | 'publishedAt'>): Promise<string> {
-  const ref = await addDoc(collection(db, EVENTS), { ...payload, createdAt: Date.now(), updatedAt: Date.now() });
-  await setDoc(ref, { id: ref.id }, { merge: true });
-  return ref.id;
-}
-
+export async function createEvent(payload: {
+    title: string;
+    date: string; // YYYY-MM-DD
+    startTime?: string | null;
+    endTime?: string | null;
+    location?: string;
+    description?: string;
+    status: 'draft' | 'published' | 'cancelled';
+  }) {
+    return addDoc(collection(db, 'events'), {
+      ...payload,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
 export async function updateEvent(eventId: string, patch: Partial<EventDoc>) {
   await updateDoc(doc(db, EVENTS, eventId), { ...patch, updatedAt: Date.now() });
 }

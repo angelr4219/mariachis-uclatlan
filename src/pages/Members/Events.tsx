@@ -1,7 +1,6 @@
 // src/pages/Members/Events.tsx
 import React from 'react';
-import EventCard from '../../components/events/EventCard';
-import type { EventType as EventCardType } from '../../components/events/EventCard';
+import EventCard, { type EventType as EventCardType } from '../../components/events/EventCard';
 import EventModal from '../../components/events/EventModal';
 import { observeEvents } from '../../services/events';
 import type { EventItem } from '../../types/events';
@@ -12,10 +11,9 @@ function toEventCardType(vm: EventItem): EventCardType {
   return {
     id: vm.id,
     title: vm.title,
-    date,
-    time,
+    dateStr: time ? `${date}, ${time}` : date,
     location: vm.location || '',
-    description: vm.description || '',
+    notes: vm.description || '',
     status: vm.status,
   };
 }
@@ -28,7 +26,7 @@ const MembersEvents: React.FC = () => {
   React.useEffect(() => {
     const unsub = observeEvents(
       (list) => {
-        setEvents(list.map(toEventCardType)); // map EventItem -> EventCardType
+        setEvents(list.map(toEventCardType));
         setLoading(false);
       },
       (err) => {

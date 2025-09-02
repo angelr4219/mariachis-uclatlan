@@ -1,10 +1,26 @@
-// src/pages/Members/MemberEvents.tsx
+// =============================================
+// FILE: src/pages/Members/MemberEvents.tsx
+// Purpose: Member-facing view-only list mapped to EventCard.EventType (dateStr required)
+// =============================================
 import React from 'react';
 import EventCard, { type EventType as EventCardType } from '../../components/events/EventCard';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, subscribeUpcomingEvents } from '../../services/events';
 import type { EventItem } from '../../types/events';
-import { formatCardVM } from '../../utils/events';
+import { formatDateRange } from '../../utils/events';
+
+// Map Firestore EventItem -> EventCardType expected by <EventCard/>
+function toEventCardType(vm: EventItem): EventCardType {
+  const { date, time } = formatDateRange(vm);
+  return {
+    id: vm.id,
+    title: vm.title,
+    dateStr: time ? `${date}, ${time}` : date, // <-- EventCard expects dateStr
+    location: vm.location || '',
+    notes: vm.description || '',
+    status: vm.status,
+  };
+}
 
 const MemberEvents: React.FC = () => {
   const [me, setMe] = React.useState<any>(null);
@@ -13,10 +29,12 @@ const MemberEvents: React.FC = () => {
 
   React.useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => setMe(u));
+
     const unsub = subscribeUpcomingEvents(['published'], (list: EventItem[]) => {
-      setEvents(list.map((e) => formatCardVM(e)));
+      setEvents(list.map(toEventCardType));
       setLoading(false);
     });
+
     return () => { unsub(); unsubAuth(); };
   }, []);
 
@@ -28,7 +46,7 @@ const MemberEvents: React.FC = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
         {events.map((ev) => (
-          <EventCard key={ev.id} event={ev} />
+          <EventCard key={ev.id} event={ev} /* view-only: canManage=false, canRSVP=false */ />
         ))}
       </div>
     </section>

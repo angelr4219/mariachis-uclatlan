@@ -1,59 +1,69 @@
 rules_version = '2';
 service cloud.firestore {
-match /databases/{database}/documents {
+  match /databases/{database}/documents {
 
+    function isSignedIn() { return request.auth != null; }
 
-function isSignedIn() { return request.auth != null; }
-function isAdmin() {
-// Mark admins via custom claims OR profile flag
-return (request.auth.token.admin == true)
-|| exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
-get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.isAdmin == true;
-}
+    function isAdmin() {
+      return (request.auth.token.admin == true)
+        ||
+        (
+          request.auth != null &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+        );
+    }
 
+    // Users (profiles)
+    match /users/{uid} {
+      // Only owner can read their doc
+      allow read: if isSignedIn() && request.auth.uid == uid;
 
-match /profiles/{uid} {
-allow read: if isSignedIn();
-allow write: if isSignedIn() && request.auth.uid == uid;
-}
+      // Owner can create/update their profile, but cannot set admin flag
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && !('isAdmin' in request.resource.data.keys());
 
+      allow update: if isSignedIn() && request.auth.uid == uid
+        && !('isAdmin' in request.resource.data.diff(resource.data).changedKeys());
 
-match /clients/{id} {
-allow create: if true; // public lead forms ok
-allow read: if isAdmin();
-allow update, delete: if isAdmin();
-}
+      // Optional: allow admins to write anyone's user doc (e.g., to grant roles)
+      allow write: if isAdmin();
+    }
 
+    // Clients/inquiries (public forms)
+    match /clients/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
 
-match /inquiries/{id} {
-allow create: if true; // public lead forms ok
-allow read, update, delete: if isAdmin();
-}
+    match /inquiries/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
 
+    // Events
+    match /events/{id} {
+      // Public read (you can tighten if you want)
+      allow get, list: if true;
 
-match /events/{id} {
-allow read: if true; // public calendar visibility; tighten if needed
+      // Only admins can manage
+      allow create, update, delete: if isAdmin();
+    }
 
-
-// Admins can manage
-allow create, update, delete: if isAdmin();
-}
-
-
-match /rsvps/{rid} {
-allow read: if isSignedIn();
-allow create, update: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-allow delete: if isAdmin();
-}
-
-match /databases/{database}/documents {
-    match /events/{eventId} {
-      allow read: if true; // tighten as needed
-      match /rsvps/{uid} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == uid;
-        }
-      }
+    // RSVPs
+    match /rsvps/{rid} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAdmin();
     }
   }
+  match /databases/{database}/documents {
+// Public read rules for other collections go here if needed
+
+
+match /profiles/{userId} {
+allow read: if request.auth != null && (
+request.auth.uid == userId || request.auth.token.admin == true
+);
+}
 }

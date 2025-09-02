@@ -1,38 +1,39 @@
-// src/pages/Register.tsx — CLEANED & FIXED (single reCAPTCHA, no duplicates)
-import React, { useState, useEffect, useRef } from 'react';
+// =============================================
+// FILE: src/pages/Register.tsx
+// Fix: type-only imports for TS "verbatimModuleSyntax" + minor typings
+// =============================================
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Register.css';
-
+// 👉 Split type vs value imports (TS 5 verbatimModuleSyntax)
+import type { Auth, ConfirmationResult } from 'firebase/auth';
 import {
-  createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
   RecaptchaVerifier,
+  createUserWithEmailAndPassword,
   signInWithPhoneNumber,
-  type ConfirmationResult,
+  signInWithPopup,
 } from 'firebase/auth';
 import { auth } from '../firebase';
-import { serverTimestamp } from 'firebase/firestore';
 import { upsertProfile } from '../services/profile';
-import type { UserProfile } from '../types/user';
+import './Register.css';
 
-// ---------------- Utils ----------------
-const csvToArray = (csv: string): string[] =>
-  Array.from(new Set(csv.split(',').map((s) => s.trim()).filter(Boolean)));
+// Avoid using RecaptchaVerifier in a type position to keep imports clean
+declare global {
+  interface Window {
+    _registerRecaptcha?: any; // instance cached here
+  }
+}
 
-const E164_RE = /^\+[1-9]\d{7,14}$/; // basic phone sanity check
+const recaptchaContainerId = 'recaptcha-container-register';
 
-// ---------------- Component ----------------
 const RegisterForm: React.FC = () => {
-  const navigate = useNavigate();
-
-  // Email/Password registration form
   const [form, setForm] = useState({
     name: '',
     email: '',
     phoneNumber: '',
     year: '',
     major: '',
+    instrument: '',
     instrumentsCsv: '',
     sectionCsv: '',
     returning: '',
@@ -43,144 +44,130 @@ const RegisterForm: React.FC = () => {
     password: '',
   });
 
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+
   // Phone auth state
-  const [phone, setPhone] = useState(''); // "+1##########"
-  const [code, setCode] = useState('');
+  const [phone, setPhone] = useState<string>('');
+  const [code, setCode] = useState<string>('');
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleChange: React.ChangeEventHandler<
     HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-  > = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  > = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
-  // -------- Email/Password Submit --------
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
+  const instrumentsFromCsv = useMemo(
+    () => form.instrumentsCsv.split(',').map((s) => s.trim()).filter(Boolean),
+    [form.instrumentsCsv]
+  );
+
+  const firstSectionFromCsv = useMemo(() => {
+    const arr = form.sectionCsv.split(',').map((s) => s.trim()).filter(Boolean);
+    return arr.length ? arr[0] : '';
+  }, [form.sectionCsv]);
+
+  const seedProfileFor = async (
+    uid: string,
+    fallbackEmail?: string | null,
+    extras?: Partial<Parameters<typeof upsertProfile>[1]>
+  ) => {
+    await upsertProfile(uid, {
+      name: form.name,
+      email: form.email || fallbackEmail || undefined,
+      phoneNumber: form.phoneNumber,
+      year: form.year,
+      major: form.major,
+      instrument: form.instrument,
+      instruments: instrumentsFromCsv.length ? instrumentsFromCsv : undefined,
+      section: firstSectionFromCsv || undefined,
+      returning: form.returning,
+      bio: form.bio,
+      emergencyName: form.emergencyName,
+      emergencyPhone: form.emergencyPhone,
+      emergencyRelation: form.emergencyRelation,
+      roles: ['performer'],
+      ...(extras || {}),
+    });
+  };
+
+  // ---------- Email/password flow ----------
+  const handleSubmit: React.FormEventHandler = async (e) => {
     e.preventDefault();
-    setError(null);
+    setError('');
     setLoading(true);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
-
-      const profile: Partial<UserProfile> = {
-        uid: cred.user.uid,
-        name: form.name.trim(),
-        email: form.email.trim().toLowerCase(),
-        
-        instruments: csvToArray(form.instrumentsCsv),
-        
-        roles: ['performer'],
- 
-      };
-
-      await upsertProfile(cred.user.uid, profile);
+      const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      await seedProfileFor(cred.user.uid, cred.user.email);
       navigate('/members');
     } catch (err: any) {
-      console.error('[Register/email] ', err);
-      setError(err?.message ?? 'Registration failed');
+      setError(err?.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
   };
 
-  // -------- Google Sign Up --------
+  // ---------- Google flow ----------
   const handleGoogle = async () => {
-    setError(null);
+    setError('');
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const { user } = await signInWithPopup(auth, provider);
-
-      const profile: Partial<UserProfile> = {
-        uid: user.uid,
-        name: user.displayName ?? '',
-        email: (user.email ?? '').toLowerCase(),
-        
-        roles: ['performer'],
-        
-      };
-
-      await upsertProfile(user.uid, profile);
+      const cred = await signInWithPopup(auth, provider);
+      await seedProfileFor(cred.user.uid, cred.user.email);
       navigate('/members');
     } catch (err: any) {
-      console.error('[Register/google] ', err);
-      setError(err?.message ?? 'Google sign-in failed');
+      setError(err?.message || 'Google sign-in failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // -------- Phone Sign Up (single, correct reCAPTCHA) --------
-  const verifierRef = useRef<RecaptchaVerifier | null>(null);
-  const recaptchaContainerId = 'recaptcha-container';
-
-  // Initialize once after the container exists in the DOM
-  useEffect(() => {
-    if (verifierRef.current) return;
-    try {
-      const v = new RecaptchaVerifier(auth, recaptchaContainerId, { size: 'invisible' });
-      verifierRef.current = v;
-      // Some versions need an explicit render
-      // @ts-ignore
-      v.render?.();
-    } catch (e1) {
-      try {
-        // Compat signature fallback
-        // @ts-ignore
-        const v2 = new RecaptchaVerifier(recaptchaContainerId, { size: 'invisible' }, auth);
-        verifierRef.current = v2 as any;
-        // @ts-ignore
-        v2.render?.();
-      } catch (e2) {
-        console.warn('reCAPTCHA init failed', e1, e2);
-      }
+  // ---------- Phone flow ----------
+  const ensureRecaptcha = (authInst: Auth) => {
+    if (!window._registerRecaptcha) {
+      window._registerRecaptcha = new RecaptchaVerifier(authInst, recaptchaContainerId, {
+        size: 'normal',
+      });
     }
-  }, []);
+    return window._registerRecaptcha as RecaptchaVerifier;
+  };
 
   const sendCode = async () => {
-    setError(null);
+    setError('');
+    if (!phone) {
+      setError('Enter a phone number in E.164 format, e.g. +13105551234');
+      return;
+    }
     setLoading(true);
     try {
-      const verifier = verifierRef.current;
-      if (!verifier) throw new Error('reCAPTCHA not ready');
-      if (!E164_RE.test(phone.trim())) throw new Error('Enter a valid E.164 phone (e.g. +13105551234)');
-      const result = await signInWithPhoneNumber(auth, phone.trim(), verifier);
-      setConfirmationResult(result);
+      const verifier = ensureRecaptcha(auth);
+      const conf = await signInWithPhoneNumber(auth, phone, verifier);
+      setConfirmationResult(conf);
     } catch (err: any) {
-      console.error('[Register/phone send] ', err);
-      setError(err?.message ?? 'Failed to send verification code');
-      try {
-        // allow retrial
-        // @ts-ignore
-        verifierRef.current?.reset?.();
-        // @ts-ignore
-        verifierRef.current?.render?.();
-      } catch {}
+      setError(err?.message || 'Failed to send verification code');
     } finally {
       setLoading(false);
     }
   };
 
   const confirmCode = async () => {
-    if (!confirmationResult) return;
-    setError(null);
+    setError('');
+    if (!confirmationResult || !code) {
+      setError('Enter the verification code you received');
+      return;
+    }
     setLoading(true);
     try {
-      const { user } = await confirmationResult.confirm(code.trim());
-      const profile: Partial<UserProfile> = {
-        uid: user.uid,
-        name: form.name.trim() || undefined,
-        email: (user.email ?? form.email.trim()).toLowerCase() || undefined,
-        
-        roles: ['performer'],
-        
-      };
-      await upsertProfile(user.uid, profile);
+      const cred = await confirmationResult.confirm(code);
+      await seedProfileFor(cred.user.uid, cred.user.email, { phoneNumber: phone });
       navigate('/members');
     } catch (err: any) {
-      console.error('[Register/phone verify] ', err);
-      setError(err?.message ?? 'Invalid verification code');
+      setError(err?.message || 'Verification failed');
     } finally {
       setLoading(false);
     }
@@ -189,15 +176,24 @@ const RegisterForm: React.FC = () => {
   return (
     <section className="register-container">
       <h1 className="register-title">Create your account</h1>
-      <p className="register-subtitle">Choose email, Google, or phone. You can edit details later in your portal.</p>
+      <p className="register-subtitle">Use email, Google, or phone. You can edit details later in your portal.</p>
 
       {/* Email/Password registration */}
       <form onSubmit={handleSubmit} className="register-form">
-        <div className="field"><label className="label" htmlFor="name">Full Name</label><input className="input" id="name" name="name" value={form.name} onChange={handleChange} placeholder="Jane Doe" required /></div>
+        <div className="field">
+          <label className="label" htmlFor="name">Full Name</label>
+          <input className="input" id="name" name="name" value={form.name} onChange={handleChange} placeholder="Jane Doe" required />
+        </div>
 
         <div className="grid-2 gap">
-          <div className="field"><label className="label" htmlFor="email">Email</label><input className="input" id="email" name="email" type="email" value={form.email} onChange={handleChange} placeholder="you@ucla.edu" autoComplete="email" required /></div>
-          <div className="field"><label className="label" htmlFor="phoneNumber">Phone</label><input className="input" id="phoneNumber" name="phoneNumber" value={form.phoneNumber} onChange={handleChange} placeholder="(###) ###-####" /></div>
+          <div className="field">
+            <label className="label" htmlFor="email">Email</label>
+            <input className="input" id="email" name="email" type="email" value={form.email} onChange={handleChange} placeholder="you@ucla.edu" autoComplete="email" required />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="phoneNumber">Phone</label>
+            <input className="input" id="phoneNumber" name="phoneNumber" value={form.phoneNumber} onChange={handleChange} placeholder="(###) ###-####" />
+          </div>
         </div>
 
         <div className="grid-2 gap">
@@ -210,15 +206,32 @@ const RegisterForm: React.FC = () => {
               <option>3rd Year</option>
               <option>4th Year</option>
               <option>Graduate</option>
+              <option>Alumni</option>
             </select>
           </div>
-          <div className="field"><label className="label" htmlFor="major">Major</label><input className="input" id="major" name="major" value={form.major} onChange={handleChange} placeholder="Physics, EE, Music, ..." /></div>
+          <div className="field">
+            <label className="label" htmlFor="major">Major</label>
+            <input className="input" id="major" name="major" value={form.major} onChange={handleChange} placeholder="Physics, EE, Music, ..." />
+          </div>
         </div>
 
-        <div className="field"><label className="label" htmlFor="instrumentsCsv">Instrument(s) (comma-separated)</label><input className="input" id="instrumentsCsv" name="instrumentsCsv" value={form.instrumentsCsv} onChange={handleChange} placeholder="violin, guitar, trumpet, voice" /></div>
-        <div className="field"><label className="label" htmlFor="sectionCsv">Section(s) (optional, comma-separated)</label><input className="input" id="sectionCsv" name="sectionCsv" value={form.sectionCsv} onChange={handleChange} placeholder="violas, violins, harp, voces" /></div>
+        <div className="field">
+          <label className="label" htmlFor="instrument">Primary Instrument</label>
+          <input className="input" id="instrument" name="instrument" value={form.instrument} onChange={handleChange} placeholder="Violin, Trumpet, Vihuela..." />
+        </div>
 
-        <div className="field"><label className="label" htmlFor="returning">Are you a returning member?</label>
+        <div className="field">
+          <label className="label" htmlFor="instrumentsCsv">Instrument(s) (comma-separated)</label>
+          <input className="input" id="instrumentsCsv" name="instrumentsCsv" value={form.instrumentsCsv} onChange={handleChange} placeholder="violin, guitar, trumpet, voice" />
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="sectionCsv">Section(s) (optional, comma-separated)</label>
+          <input className="input" id="sectionCsv" name="sectionCsv" value={form.sectionCsv} onChange={handleChange} placeholder="violas, violins, harp, voces" />
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="returning">Are you a returning member?</label>
           <select className="input" id="returning" name="returning" value={form.returning} onChange={handleChange} required>
             <option value="">Select</option>
             <option value="Yes">Yes</option>
@@ -226,47 +239,75 @@ const RegisterForm: React.FC = () => {
           </select>
         </div>
 
-        <div className="field"><label className="label" htmlFor="bio">Short Bio (optional)</label><textarea className="input" id="bio" name="bio" value={form.bio} onChange={handleChange} placeholder="Tell us a little about your experience" rows={3} /></div>
-
-        <div className="grid-3 gap">
-          <div className="field"><label className="label" htmlFor="emergencyName">Emergency Contact Name</label><input className="input" id="emergencyName" name="emergencyName" value={form.emergencyName} onChange={handleChange} /></div>
-          <div className="field"><label className="label" htmlFor="emergencyPhone">Emergency Contact Phone</label><input className="input" id="emergencyPhone" name="emergencyPhone" value={form.emergencyPhone} onChange={handleChange} /></div>
-          <div className="field"><label className="label" htmlFor="emergencyRelation">Relation</label><input className="input" id="emergencyRelation" name="emergencyRelation" value={form.emergencyRelation} onChange={handleChange} /></div>
+        <div className="field">
+          <label className="label" htmlFor="bio">Short Bio (optional)</label>
+          <textarea className="input" id="bio" name="bio" value={form.bio} onChange={handleChange} placeholder="Tell us a little about your experience" rows={3} />
         </div>
 
-        <div className="field"><label className="label" htmlFor="password">Password</label><input className="input" type="password" id="password" name="password" value={form.password} onChange={handleChange} required /></div>
+        <div className="grid-3 gap">
+          <div className="field">
+            <label className="label" htmlFor="emergencyName">Emergency Contact Name</label>
+            <input className="input" id="emergencyName" name="emergencyName" value={form.emergencyName} onChange={handleChange} />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="emergencyPhone">Emergency Contact Phone</label>
+            <input className="input" id="emergencyPhone" name="emergencyPhone" value={form.emergencyPhone} onChange={handleChange} />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="emergencyRelation">Relation</label>
+            <input className="input" id="emergencyRelation" name="emergencyRelation" value={form.emergencyRelation} onChange={handleChange} />
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="password">Password</label>
+          <input className="input" type="password" id="password" name="password" value={form.password} onChange={handleChange} required />
+        </div>
 
         {error && <p className="error">{error}</p>}
-        <button type="submit" className="submit" disabled={loading}>{loading ? 'Creating account…' : 'Register with Email'}</button>
+        <button type="submit" className="submit" disabled={loading}>
+          {loading ? 'Creating account…' : 'Register with Email'}
+        </button>
       </form>
 
-      {/* Divider */}
       <div className="divider"><span>or</span></div>
 
-      {/* Google */}
       <div className="oauth-row">
         <button type="button" className="btn-google" onClick={handleGoogle} disabled={loading} aria-label="Continue with Google">
           Continue with Google
         </button>
       </div>
 
-      {/* Phone sign-up */}
       <div className="phone-card">
         {!confirmationResult ? (
           <div className="grid-2 gap">
-            <div className="field"><label className="label" htmlFor="phone">Phone (E.164, e.g. +13105551234)</label><input className="input" id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1##########" /></div>
-            <div className="field"><label className="label">&nbsp;</label><button type="button" className="btn-outline" onClick={sendCode} disabled={loading || !phone}>Send verification code</button></div>
+            <div className="field">
+              <label className="label" htmlFor="phone">Phone (E.164, e.g. +13105551234)</label>
+              <input className="input" id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1##########" />
+            </div>
+            <div className="field">
+              <label className="label">&nbsp;</label>
+              <button type="button" className="btn-outline" onClick={sendCode} disabled={loading || !phone}>
+                Send verification code
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid-2 gap">
-            <div className="field"><label className="label" htmlFor="code">Enter verification code</label><input className="input" id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" /></div>
-            <div className="field"><label className="label">&nbsp;</label><button type="button" className="btn-outline" onClick={confirmCode} disabled={loading || !code}>Verify & Create account</button></div>
+            <div className="field">
+              <label className="label" htmlFor="code">Enter verification code</label>
+              <input className="input" id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" />
+            </div>
+            <div className="field">
+              <label className="label">&nbsp;</label>
+              <button type="button" className="btn-outline" onClick={confirmCode} disabled={loading || !code}>
+                Verify & Create account
+              </button>
+            </div>
           </div>
         )}
-        {/* Container must exist for reCAPTCHA */}
         <div id={recaptchaContainerId} />
       </div>
-
     </section>
   );
 };

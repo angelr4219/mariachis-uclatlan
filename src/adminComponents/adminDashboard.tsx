@@ -3,12 +3,12 @@
 // FILE: src/components/Admin/AdminDashboard.tsx
 // ================================================
 import React from 'react';
-import AdminNavbar from './adminNavbar';
+
 
 const AdminDashboard: React.FC = () => {
   return (
     <>
-      <AdminNavbar />
+
       <div className="admin-page">
         <header className="admin-header">
           <h1>Admin Dashboard</h1>

@@ -1,121 +1,94 @@
-// src/pages/admin/AdminEvents.tsx
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../firebase';
-import {
-  createEvent,
-  publishEvent,
-  cancelEvent,
-  subscribeUpcomingEvents,
-  updateEvent,
-} from '../../services/events';
-import type { EventItem, EventDoc, RoleNeed } from '../../types/events';
-import '../../components/Calendar/CalendarApp';
-import { Timestamp } from 'firebase/firestore';
-import './AdminEvents.css'; 
 
-const emptyRoles: RoleNeed[] = [
-  { role: 'violin', count: 0 },
-  { role: 'trumpet', count: 0 },
-  { role: 'vihuela', count: 0 },
-  { role: 'guitarrón', count: 0 },
-  { role: 'guitarra', count: 0 },
-  { role: 'harp', count: 0 },
-];
+// =============================================
+// FILE: src/pages/admin/AdminEvents.tsx (UPDATED)
+// Adds: create button + modal; calls services.events.createEvent
+// =============================================
+import React from 'react';
+import EventCard from '../../components/events/EventCard';
+import type { EventType as EventCardType } from '../../components/events/EventCard';
+import { observeEvents, updateEvent, createEvent } from '../../services/events';
+import type { EventItem } from '../../types/events';
+import { formatDateRange } from '../../utils/events';
+import CreateEventModal, { type EventDraft } from '../../components/events/CreateEventModal';
 
-export default function AdminEvents() {
-  const nav = useNavigate();
-  const [me, setMe] = useState<any>(null);
-  const [rows, setRows] = useState<EventItem[]>([]); // EventItem uses Date for start/end
+function toEventCardType(vm: EventItem): EventCardType {
+  const { date, time } = formatDateRange(vm);
+  return {
+    id: vm.id,
+    title: vm.title,
+    dateStr: time ? `${date}, ${time}` : date,
+    location: vm.location || '',
+    notes: vm.description || '',
+    status: vm.status,
+  };
+}
 
-  useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => setMe(u));
-    const unsub = subscribeUpcomingEvents(['draft', 'published'], setRows);
-    return () => { unsub(); unsubAuth(); };
+const AdminEvents: React.FC = () => {
+  const [events, setEvents] = React.useState<EventCardType[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [showCreate, setShowCreate] = React.useState(false);
+
+  React.useEffect(() => {
+    const unsub = observeEvents(
+      (list: EventItem[]) => {
+        setEvents(list.map(toEventCardType));
+        setLoading(false);
+      },
+      (err: unknown) => {
+        console.error('[AdminEvents subscribe]', err);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
   }, []);
 
-  const [form, setForm] = useState({
-    title: '',
-    start: '', // e.g. 2025-09-01T18:00
-    end: '',
-    location: '',
-    description: '', // use `description` (was `notes` before)
-    roles: emptyRoles,
-  });
+  const handleEdit = (id: string) => {
+    console.log('edit', id);
+  };
 
-  async function handleCreate() {
-    if (!me?.email) { alert('Sign in as admin'); return; }
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete (cancel) this event?')) return;
+    try { await updateEvent(id, { status: 'cancelled' }); }
+    catch (e) { console.error('[handleDelete]', e); alert('Failed to delete (cancel) event.'); }
+  };
 
-    const payload: Omit<EventDoc, 'id'|'createdAt'|'updatedAt'|'publishedAt'> = {
-      title: form.title,
-      start: Timestamp.fromDate(new Date(form.start)),
-      end: form.end ? Timestamp.fromDate(new Date(form.end)) : undefined,
-      location: form.location,
-      description: form.description,
-      status: 'draft',
-      rolesNeeded: form.roles.filter(r => r.count > 0),
-      assignedUids: [],
-      client: null,
-      createdBy: me.email,
+  const handleCreate = async (d: EventDraft) => {
+    // Map EventDraft -> your EventItem create payload
+    const payload = {
+      title: d.title.trim(),
+      date: d.date,           // expect utils/formatDateRange to understand this + times
+      startTime: d.startTime || null,
+      endTime: d.endTime || null,
+      location: d.location?.trim() || '',
+      description: d.description?.trim() || '',
+      status: d.status ?? 'draft',
     } as any;
-
-    const id = await createEvent(payload);
-    console.log('[Admin] created event', id);
-    setForm({ title:'', start:'', end:'', location:'', description:'', roles: emptyRoles });
-  }
+    await createEvent(payload);
+  };
 
   return (
-    <div className="admin-events">  {/* ← wrap everything */}
-      <h2>Admin Events</h2>
+    <section className="ucla-content" style={{ maxWidth: 1024, margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <h1 className="ucla-heading-xl">Manage Events</h1>
+        <button className="btn" onClick={() => setShowCreate(true)}>+ Create Event</button>
+      </div>
 
-      <section className="event-form">
-        <h3>New Event</h3>
-        <div className="grid">
-          {/* inputs ... */}
-        </div>
+      {loading && <p>Loading events…</p>}
 
-        {/* For consistency, you can style the create button as primary: */}
-        <button className="btn-primary" onClick={handleCreate} style={{ marginTop: '0.75rem' }}>
-          Create (Draft)
-        </button>
-      </section>
-
-      <section style={{ marginTop: '1rem' }}>
-        <h3>Upcoming Events</h3>
-        <div className="event-list">
-          {rows.map(ev => (
-            <div key={ev.id} className="event-card">
-              <div className="event-head">
-                <h3>{ev.title}</h3>
-                <span className={`status ${ev.status}`}>{ev.status}</span>
-              </div>
-
-              <div className="event-meta">
-                <div><strong>When:</strong> {ev.start.toLocaleString()} {ev.end ? `– ${ev.end.toLocaleTimeString()}` : ''}</div>
-                <div><strong>Where:</strong> {ev.location}</div>
-              </div>
-
-              <div className="card-actions">
-                {ev.status !== 'published' && (
-                  <button className="btn-publish" onClick={() => publishEvent(ev.id!)}>Publish</button>
-                )}
-                {ev.status === 'published' && (
-                  <button className="btn-cancel" onClick={() => cancelEvent(ev.id!)}>Cancel</button>
-                )}
-                <button
-                  className="btn-edit"
-                  onClick={() =>
-                    updateEvent(ev.id!, { description: ((ev.description) || '') + '\n(edited)' })
-                  }
-                >
-                  Quick Edit Notes
-                </button>
-              </div>
-            </div>
+      {!loading && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16, marginTop: 16 }}>
+          {events.map((ev) => (
+            <EventCard key={ev.id} event={ev} canManage onEdit={handleEdit} onDelete={handleDelete} />
           ))}
         </div>
-      </section>
-    </div>
+      )}
+
+      {!loading && events.length === 0 && <p>No events found.</p>}
+
+      <CreateEventModal open={showCreate} onClose={() => setShowCreate(false)} onCreate={handleCreate} />
+    </section>
   );
-}
+};
+
+export default AdminEvents;
+

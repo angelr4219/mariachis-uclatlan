@@ -1,0 +1,11 @@
+
+.availability-list { display: grid; gap: 1rem; }
+.availability-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.availability-head { display:flex; align-items:center; justify-content:space-between; }
+.availability-title { margin: 0; }
+.status-pill { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 6px; text-transform: capitalize; background:#eef2ff; color:#3730a3; }
+.status-pill.published { background:#dcfce7; color:#065f46; }
+.status-pill.draft { background:#fee2e2; color:#991b1b; }
+.status-pill.cancelled { background:#e5e7eb; color:#374151; }
+.availability-meta { color:#374151; margin-top: 0.5rem; display:grid; gap: 0.25rem; }
+.availability-actions { margin-top: 0.75rem; display:flex; gap: 0.5rem; align-items:center; }

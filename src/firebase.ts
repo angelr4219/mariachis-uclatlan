@@ -5,6 +5,7 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions'; // <-- Add this import
+import { getStorage } from 'firebase/storage';
 
 var APIKEY = "AIzaSyBTl0Jl9ZMQBA84LBbECwzUz5jcL4dYV3Y"
 var AUTHDOMAIN = "mduwebsite1345.firebaseapp.com"
@@ -25,4 +26,5 @@ export const app: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app); 
+export const storage = getStorage(app);
 export default app;

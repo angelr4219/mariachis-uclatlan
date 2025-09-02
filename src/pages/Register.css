@@ -1,35 +1,41 @@
 
-.register-container { max-width: 720px; margin: 0 auto; padding: 0 1rem 2rem; }
-.register-title { font-size: 2rem; font-weight: 700; margin: 0.25rem 0 0; }
-.register-subtitle { margin: 0.5rem 0 1rem; color: #444; }
-
-.register-form { margin-top: 1rem; }
-.field { margin-bottom: 1rem; }
-.label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
-.input, .textarea, select.input { width: 100%; padding: 0.5rem; border: 1px solid #d6d6d6; border-radius: 6px; background: #fff; }
-.textarea { min-height: 96px; resize: vertical; }
-.fieldset { margin-bottom: 1rem; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; }
-.legend { font-weight: 600; }
-
-.gap { gap: 0.75rem; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; }
-.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
-@media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
-
-.submit { padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #2774AE; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
-.submit:disabled { opacity: 0.7; cursor: not-allowed; }
-.error { color: #b00020; margin-bottom: 0.75rem; }
-
-/* Extras */
-.divider { display: flex; align-items: center; justify-content: center; margin: 1.25rem 0; position: relative; }
-.divider::before, .divider::after { content: ""; height: 1px; background: #e5e5e5; flex: 1; }
-.divider span { padding: 0 0.75rem; color: #777; }
-
-.oauth-row { display: flex; justify-content: center; margin-bottom: 1rem; }
-.btn-google { padding: 0.65rem 1rem; border-radius: 6px; border: 1px solid #d6d6d6; background: #fff; cursor: pointer; }
-.btn-google:disabled { opacity: 0.7; cursor: not-allowed; }
-
-.phone-card { border: 1px solid #e8e8e8; border-radius: 8px; padding: 1rem; }
-.btn-outline { padding: 0.6rem 1rem; border: 1px solid #2774AE; background: transparent; color: #2774AE; border-radius: 6px; cursor: pointer; }
-.btn-outline:disabled { opacity: 0.7; cursor: not-allowed; }
-
+/* =============================================
+   FILE: src/pages/Register.css
+   Minimal, clean styling for Register page
+   ============================================= */
+   .register-container { max-width: 920px; margin: 0 auto; padding: 2rem 1rem; }
+   .register-title { font-size: 1.75rem; margin: 0 0 .25rem; }
+   .register-subtitle { color: #4b5563; margin: 0 0 1.5rem; }
+   
+   .register-form { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; }
+   
+   .field { display: flex; flex-direction: column; gap: .35rem; margin-bottom: .9rem; }
+   .label { font-weight: 600; font-size: .9rem; color: #374151; }
+   .input { border: 1px solid #d1d5db; border-radius: 8px; padding: .6rem .7rem; font-size: .95rem; }
+   .input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+   
+   .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); }
+   .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); }
+   .gap { gap: 1rem; }
+   
+   .submit { background: #2563eb; color: #fff; border: 0; border-radius: 10px; padding: .75rem 1rem; font-weight: 600; }
+   .submit:disabled { opacity: .6; }
+   
+   .error { color: #b91c1c; margin: .5rem 0; }
+   
+   .divider { display: grid; place-items: center; color: #6b7280; margin: 1rem 0; position: relative; }
+   .divider::before, .divider::after { content: ""; height: 1px; background: #e5e7eb; width: 100%; position: absolute; top: 50%; }
+   .divider span { background: #fff; padding: 0 .5rem; z-index: 1; }
+   
+   .oauth-row { display: flex; justify-content: center; margin-bottom: 1rem; }
+   .btn-google { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: .6rem 1rem; font-weight: 600; }
+   .btn-google:disabled { opacity: .6; }
+   
+   .phone-card { border: 1px dashed #cbd5e1; border-radius: 12px; padding: 1rem; background: #fafafa; }
+   .btn-outline { background: transparent; border: 1px solid #9ca3af; border-radius: 10px; padding: .6rem 1rem; font-weight: 600; }
+   .btn-outline:disabled { opacity: .6; }
+   
+   @media (max-width: 720px) {
+     .grid-2, .grid-3 { grid-template-columns: 1fr; }
+   }
+   
