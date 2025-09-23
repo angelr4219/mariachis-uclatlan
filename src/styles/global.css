@@ -1,0 +1,32 @@
+
+@import './breakpoints.css';
+
+
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: #101828;
+  background: #f8fafc;
+  padding-top: calc(8px + var(--safe-top));
+  padding-bottom: calc(8px + var(--safe-bottom));
+}
+
+img, video { max-width: 100%; height: auto; }
+button { cursor: pointer; }
+
+.card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+  padding: clamp(12px, 1.2vw, 20px);
+}
+
+.header-spacer { height: var(--header-h); }
+

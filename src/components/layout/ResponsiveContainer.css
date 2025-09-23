@@ -1,0 +1,8 @@
+
+.app-shell { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; }
+
+.main { padding-block: clamp(12px, 2.4vw, 28px); }
+
+.app-footer { margin-top: 32px; background: #0f172a; color: #e2e8f0; padding: 12px 0; }
+.app-footer .foot { display: flex; align-items: center; justify-content: space-between; }
+

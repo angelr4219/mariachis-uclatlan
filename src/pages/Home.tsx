@@ -1,37 +1,40 @@
-// src/pages/Home.tsx
-import React from 'react';
-import Carousel from '../components/carousel/carousel';
 
+
+// =============================================
+// FILE: src/pages/Home/Home.tsx
+// Purpose: Example page showing responsive cards + grid
+// =============================================
+
+import React from 'react';
+import './Home.css';
+import Carousel from '../components/carousel/carousel';
 const Home: React.FC = () => {
   return (
-    <div style={{ padding: '2rem', maxWidth: 1000, margin: '0 auto', lineHeight: 1.6 }}>
-      <h1>Mariachi de Uclatlán</h1>
-      <p>
-        Welcome to Mariachi de Uclatlán — UCLA's premier mariachi ensemble dedicated to
-        preserving and celebrating the vibrant traditions of Mexican music and culture.
-        Founded in 1961, Mariachi de Uclatlán stands as the first collegiate mariachi
-        group in the United States, pioneering the integration of mariachi into academic
-        programs and performance art.
-      </p>
-      <p>
-        Our ensemble is composed of passionate student musicians and dancers who are
-        committed to honoring the heritage of mariachi while continuously evolving with
-        modern influences. Through spirited performances, cultural outreach, and educational
-        initiatives, we strive to keep the heart of mariachi alive for future generations.
-      </p>
-      <p>
-        Whether you are a musician, a fan of traditional Mexican music, or someone looking
-        to connect with a vibrant community, we invite you to join us on this journey.
-        Explore our history, meet our talented members, and experience the soulful melodies
-        that define Mariachi de Uclatlán.
-      </p>
+    <section className="home stack">
+      <header className="stack">
+        <h1 className="title">Welcome</h1>
+        <p className="lede">Responsive layout tuned for iPhone, iPad, Android, and desktop.</p>
+      </header>
 
-      {/* 👉 New Carousel here */}
+      <div className="grid cols-3 stack-md">
+        <article className="card">
+          <h3>Events</h3>
+          <p>See upcoming performances and details.</p>
+        </article>
+        <article className="card">
+          <h3>Members</h3>
+          <p>Register, update profile, and set availability.</p>
+        </article>
+        <article className="card">
+          <h3>About</h3>
+          <p>Learn about Mariachi de Uclatlán.</p>
+        </article>
+      </div>
       <Carousel />
-
-      <p>¡Viva el mariachi!</p>
-    </div>
+    </section>
   );
 };
 
 export default Home;
+
+

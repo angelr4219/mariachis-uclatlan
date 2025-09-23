@@ -1,0 +1,42 @@
+
+:root { --header-h: 64px; }
+@media (min-width: 768px) { :root { --header-h: 72px; } }
+
+.app-header {
+  position: sticky;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: saturate(150%) blur(8px);
+  border-bottom: 1px solid #e5e7eb;
+  padding-top: var(--safe-top);
+}
+
+.app-header .bar {
+  height: var(--header-h);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #0f172a; font-weight: 700; font-size: var(--step-1); }
+.logo { display: grid; place-items: center; width: 32px; height: 32px; background: #f1f5f9; border-radius: 10px; box-shadow: var(--shadow-1); }
+
+.nav { display: inline-flex; gap: 16px; }
+.navlink { color: #334155; text-decoration: none; padding: 8px 10px; border-radius: 10px; }
+.navlink:hover { background: #f1f5f9; }
+
+.menu-btn { background: transparent; border: none; }
+.hamburger { position: relative; display: inline-block; width: 26px; height: 2px; background: #0f172a; }
+.hamburger::before, .hamburger::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: #0f172a; }
+.hamburger::before { top: -7px; }
+.hamburger::after { top: 7px; }
+
+.mobile-drawer {
+  display: grid;
+  gap: 8px;
+  padding: 8px max(var(--gutter), var(--safe-left)) 12px max(var(--gutter), var(--safe-right));
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+.mobile-drawer .item { text-decoration: none; color: #0f172a; padding: 12px; border-radius: 12px; }
+.mobile-drawer .item:active { background: #f1f5f9; }
+

@@ -1,0 +1,111 @@
+:root {
+    /* Layout */
+    --container-max: 1200px;
+    --gutter: 16px;
+    --radius: 16px;
+  
+    /* Elevation */
+    --shadow-1: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.1);
+    --shadow-2: 0 6px 16px rgba(0,0,0,.12);
+  
+    /* Fluid type base */
+    --step--1: clamp(0.80rem, 0.75rem + 0.20vw, 0.90rem);
+    --step-0:  clamp(0.95rem, 0.90rem + 0.25vw, 1.00rem);
+    --step-1:  clamp(1.10rem, 1.00rem + 0.60vw, 1.25rem);
+    --step-2:  clamp(1.30rem, 1.10rem + 0.90vw, 1.60rem);
+    --step-3:  clamp(1.60rem, 1.20rem + 1.50vw, 2.10rem);
+    --step-4:  clamp(2.00rem, 1.50rem + 2.20vw, 2.60rem);
+  
+    /* iOS safe-area (works on Android too, resolves to 0) */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+  
+  /* -------------------------------------------------------
+     Breakpoint ranges (logical CSS pixels)
+     - phone-xs:        <= 389.98px (older small phones)
+     - phone-std:       390px–428.98px (iPhone 14/15/16, non‑Max)
+     - phone-promax:    429px–480px  (iPhone 14–16 Pro Max ~430px, include buffer)
+     - phone-land/phab: 481px–767.98px (landscape phones / phablets)
+     - tablet:          768px–1023.98px (iPad portrait/landscape small)
+     - desktop:         >= 1024px
+  ------------------------------------------------------- */
+  
+  /* Base container */
+  .container {
+    width: min(100% - 2 * var(--gutter), var(--container-max));
+    margin-inline: auto;
+  }
+  
+  /* Utilities */
+  .grid { display: grid; gap: clamp(12px, 1.5vw, 24px); }
+  .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stack > * + * { margin-top: clamp(8px, 1.2vw, 16px); }
+  .hide-on-mobile { display: none; }
+  .hide-on-desktop { display: initial; }
+  .touch-target { min-height: 44px; padding: 10px 12px; }
+  
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  
+  /* -------- Small phones (<= 389.98) -------- */
+  @media (max-width: 389.98px) {
+    :root { --gutter: 14px; }
+    .grid.stack-md { grid-template-columns: 1fr !important; }
+  }
+  
+  /* -------- Standard iPhones (390–428.98) -------- */
+  @media (min-width: 390px) and (max-width: 428.98px) {
+    :root {
+      --gutter: 16px;
+      /* Slightly larger base for readability on 390–428 */
+      --step-0:  clamp(1.00rem, 0.95rem + 0.40vw, 1.05rem);
+    }
+    .grid.stack-md { grid-template-columns: 1fr !important; }
+  }
+  
+  /* -------- iPhone Pro Max focus (429–480) -------- */
+  @media (min-width: 429px) and (max-width: 480px) {
+    :root {
+      /* Tune specifically for ~430px width (14–16 Pro Max) */
+      --gutter: 18px;            /* a touch more breathing room */
+      --radius: 18px;
+      --step-0:  clamp(1.02rem, 0.98rem + 0.45vw, 1.08rem);
+      --step-1:  clamp(1.18rem, 1.05rem + 0.70vw, 1.35rem);
+    }
+    .grid.stack-md { grid-template-columns: 1fr !important; }
+    .only-pmx { display: initial !important; }
+  }
+  
+  /* -------- Landscape phones / phablets (481–767.98) -------- */
+  @media (min-width: 481px) and (max-width: 767.98px) {
+    :root { --gutter: 20px; }
+    .hide-on-mobile { display: initial; }
+    .hide-on-desktop { display: none; }
+  }
+  
+  /* -------- Tablets (768–1023.98) -------- */
+  @media (min-width: 768px) and (max-width: 1023.98px) {
+    :root { --gutter: 24px; }
+    .hide-on-mobile { display: initial; }
+    .hide-on-desktop { display: none; }
+  }
+  
+  /* -------- Desktop (>= 1024) -------- */
+  @media (min-width: 1024px) {
+    :root { --gutter: 28px; }
+    .hide-on-mobile { display: initial; }
+    .hide-on-desktop { display: none; }
+  }
+  
+  /* Orientation helpers (optional) */
+  @media (orientation: landscape) {
+    .only-portrait { display: none !important; }
+  }
+  @media (orientation: portrait) {
+    .only-landscape { display: none !important; }
+  }
+  
