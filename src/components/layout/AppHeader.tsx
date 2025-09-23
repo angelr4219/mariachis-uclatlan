@@ -1,8 +1,7 @@
-
-
 // =============================================
 // FILE: src/components/layout/AppHeader.tsx
 // Purpose: Responsive header with safe-area padding + mobile menu
+// Notes: Drawer only renders when `open` && isMobile
 // =============================================
 import React from 'react';
 import './AppHeader.css';
@@ -14,6 +13,11 @@ const AppHeader: React.FC = () => {
   const [open, setOpen] = React.useState(false);
   const toggle = () => setOpen(v => !v);
   const close = () => setOpen(false);
+
+  // Close drawer when switching to desktop
+  React.useEffect(() => {
+    if (!isMobile && open) setOpen(false);
+  }, [isMobile, open]);
 
   return (
     <header className={`app-header ${open ? 'open' : ''}`}>
@@ -28,12 +32,18 @@ const AppHeader: React.FC = () => {
           <Link to="/events" className="navlink">Events</Link>
           <Link to="/members" className="navlink">Members</Link>
         </nav>
-        <button className="menu-btn hide-on-desktop touch-target" aria-label="Menu" onClick={toggle}>
+        <button
+          className="menu-btn hide-on-desktop touch-target"
+          aria-label="Menu"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={toggle}
+        >
           <span className="hamburger"/>
         </button>
       </div>
 
-      {isMobile && (
+      {isMobile && open && (
         <nav className="mobile-drawer hide-on-desktop" role="dialog" aria-modal="true">
           <Link to="/" onClick={close} className="item">Home</Link>
           <Link to="/about" onClick={close} className="item">About</Link>

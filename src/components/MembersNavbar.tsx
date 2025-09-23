@@ -28,7 +28,6 @@ return (
 
 {/* Divider for dashboards */}
 <li className="divider" />
-<li><NavLink to="/performer-dashboard" className={cls}>Performer Dashboard</NavLink></li>
 <li><NavLink to="/admin-dashboard" className={cls}>Admin Dashboard</NavLink></li>
 
 

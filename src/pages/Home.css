@@ -1,12 +1,59 @@
-
-@import 'src/styles/breakpoints.css';
-
-
-
-.home .title { font-size: var(--step-3); margin: 0; }
-.home .lede { font-size: var(--step-1); color: #475569; }
-
-/* Tablet+ spacing increases */
-@media (min-width: 768px) {
-  .home .title { font-size: var(--step-4); }
-}
+/* src/Home.css */
+.home-container {
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 1rem;
+    text-align: center;
+  }
+  
+  .home-container h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: #1f2937;
+  }
+  
+  .lead {
+    font-size: 1.05rem;
+    color: #4b5563;
+    margin-bottom: 1.25rem;
+  }
+  
+  .home-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    text-align: left;
+  }
+  
+  .home-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  }
+  
+  .home-card h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1.125rem;
+    color: #111827;
+  }
+  
+  .home-card p {
+    margin: 0;
+    color: #374151;
+    line-height: 1.55;
+  }
+  
+  /* tablet */
+  @media (min-width: 640px) {
+    .home-container { padding: 1.25rem; }
+    .home-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  
+  /* desktop */
+  @media (min-width: 1024px) {
+    .home-container h1 { font-size: 2.25rem; }
+    .home-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  
