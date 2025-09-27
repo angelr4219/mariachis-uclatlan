@@ -54,6 +54,7 @@ import Reports from './adminComponents/Reports.tsx';
 import Staff from './pages/people/Staff';
 import Musicians from './pages/people/Musicians';
 import Dancers from './pages/people/Dancers';
+import InquiryReport from './adminComponents/InquiryReport';
 
 // Role-based landing
 import RoleBasedLayout from './rolebasedlayout/rbl';
@@ -143,7 +144,7 @@ const App: React.FC = () => {
               />
             }
           />
-          <Route path="reports" element={<Reports />} />
+        
           
 
           {/* ADMIN — nested; AdminLayout itself renders the AdminNavbar once */}
@@ -157,10 +158,11 @@ const App: React.FC = () => {
               </ProtectedRoute>
             }
           >
-            <Route index element={<AdminDashboard />} />
+             <Route index element={<AdminDashboard />} />
             <Route path="events" element={<AdminEvents />} />
             <Route path="managemembers" element={<AdminManageMembers />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="/adminComponents/InquiryReport" element={<InquiryReport />} />
             <Route path="inquiries" element={<AdminInquiries />} />
             <Route path="participation" element={<ParticipationReport />} />
           </Route>

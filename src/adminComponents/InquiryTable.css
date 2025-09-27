@@ -1,0 +1,12 @@
+
+.iq-table table { width: 100%; border-collapse: collapse; }
+.iq-table th, .iq-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid #e9ecef; text-align: left; }
+.iq-title { font-weight: 600; }
+.iq-subtle { color: #6c757d; font-size: 0.9rem; }
+.muted { color: #8a8f94; text-align: center; padding: 1rem; }
+.link { background: none; border: none; color: #2774AE; cursor: pointer; padding: 0; }
+.link:hover { text-decoration: underline; }
+.expand td { background: #fafbfc; }
+.yes-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; list-style: none; padding: 0; margin: 0.25rem 0 0 0; }
+
+

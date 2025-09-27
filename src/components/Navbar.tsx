@@ -18,6 +18,8 @@ const Navbar: React.FC = () => {
         <li><Link to="/contact">Contact</Link></li>
         <li><Link to="/Login">Login</Link></li>
         <li><Link to="/Register">Register</Link></li>
+        <li><Link to="/adminComponents/InquiryReport">Re</Link></li>
+        
         
       </ul>
     </nav>
