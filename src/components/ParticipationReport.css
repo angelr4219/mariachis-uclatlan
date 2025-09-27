@@ -1,22 +1,74 @@
 
-.rep-head{ display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 8px; }
-.rep-actions button{ padding: 0.6rem 0.9rem; border-radius:10px; border:1px solid #e5e7eb; background:#fff; }
-.rep-table-wrap{ overflow:auto; }
-.rep-table{ width:100%; border-collapse: collapse; background:#fff; border:1px solid #e5e7eb; border-radius: 12px; overflow:hidden; }
-.rep-table th, .rep-table td{ padding: .75rem .9rem; border-top:1px solid #f1f5f9; text-align:left; }
-.rep-table thead th{ background:#f8fafc; font-weight:700; }
-.rep-event-title{ font-weight:600; }
-.yes{ color:#065f46; }
-.maybe{ color:#92400e; }
-.no{ color:#991b1b; }
-.link-btn{ background:none; border:none; color:#2774AE; text-decoration:underline; cursor:pointer; }
+/* =============================================
+   FILE: src/pages/admin/ParticipationReport.css
+   Purpose: Styling for admin participation page
+   ============================================= */
+.participation-page {
+  padding: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
 
-.rep-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); display:grid; place-items:center; z-index:1000; }
-.rep-modal{ background:#fff; width:min(900px, calc(100% - 2rem)); border-radius:14px; padding: 1.25rem 1.5rem; box-shadow: 0 14px 36px rgba(0,0,0,.22); }
-.rep-columns{ display:grid; grid-template-columns: repeat(1, 1fr); gap: 1rem; }
-.rep-columns h4{ margin:0 0 .25rem; }
-.rep-modal-actions{ display:flex; justify-content:flex-end; margin-top: 8px; }
+.participation-page h1 {
+  margin-bottom: 1rem;
+}
 
-@media (min-width: 900px){
-  .rep-columns{ grid-template-columns: repeat(3, 1fr); }
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.toolbar input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+}
+
+.toolbar select, .toolbar button {
+  padding: 0.5rem 0.75rem;
+}
+
+.event-card {
+  border: 1px solid #e1e5ea;
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  background: #fff;
+}
+
+.event-card summary { cursor: pointer; }
+.event-card[open] { box-shadow: 0 4px 18px rgba(0,0,0,0.06); }
+
+.ev-summary { display: flex; justify-content: space-between; gap: 1rem; }
+.ev-title h3 { margin: 0 0 0.25rem 0; }
+.ev-title .meta { display: flex; gap: 0.5rem; color: #57606a; font-size: 0.9rem; }
+
+.ev-stats { display: flex; align-items: center; gap: 1rem; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 0.75rem; }
+.kpis small { display: block; color: #6b7280; }
+.kpis strong { font-size: 1.05rem; }
+
+.status.badge { padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.8rem; text-transform: capitalize; }
+.status.published { background:#e6ffed; color:#046b31; }
+.status.hidden { background:#fff7ed; color:#9a3412; }
+.status.canceled { background:#fee2e2; color:#991b1b; }
+.status.draft { background:#eff6ff; color:#1e40af; }
+
+.ev-actions { display: flex; gap: 0.5rem; padding: 0.5rem 0; }
+.ev-actions button { padding: 0.45rem 0.75rem; }
+.ev-actions .danger { background: #ef4444; color: white; border: none; }
+
+.ev-financials, .ev-participants { margin: 0.5rem 0 1rem; }
+
+.ev-financials table, .ev-participants table { width: 100%; border-collapse: collapse; }
+.ev-financials th, .ev-financials td, .ev-participants th, .ev-participants td {
+  border-bottom: 1px solid #e5e7eb; padding: 0.5rem; text-align: left;
+}
+
+.others { margin-top: 0.5rem; }
+
+@media (max-width: 780px) {
+  .ev-summary { flex-direction: column; }
+  .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }

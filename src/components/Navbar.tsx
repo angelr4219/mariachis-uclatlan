@@ -11,10 +11,14 @@ const Navbar: React.FC = () => {
       <ul className="nav-links">
         <li><Link to="/">Home</Link></li>
         <li><Link to="/about">About</Link></li>
+        <li><Link to="/musicians">Musicians</Link></li>
+        <li><Link to="/dancers">Dancers</Link></li>
+        <li><Link to="/staff">Staff</Link></li>
         <li><Link to="/members">Members</Link></li>
         <li><Link to="/contact">Contact</Link></li>
         <li><Link to="/Login">Login</Link></li>
         <li><Link to="/Register">Register</Link></li>
+        
       </ul>
     </nav>
   );

@@ -1,0 +1,24 @@
+
+.people-page {
+  padding: 2rem 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.people-header {
+  margin-bottom: 1rem;
+}
+.people-subtitle {
+  margin-top: 0.25rem;
+  color: #555;
+}
+.people-grid {
+  margin-top: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1rem;
+}
+/* Responsive card spans */
+.people-grid > * { grid-column: span 12; }
+@media (min-width: 520px) { .people-grid > * { grid-column: span 6; } }
+@media (min-width: 900px) { .people-grid > * { grid-column: span 4; } }
+@media (min-width: 1200px) { .people-grid > * { grid-column: span 3; } }

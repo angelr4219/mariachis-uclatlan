@@ -1,0 +1,73 @@
+
+/* =============================================
+   FILE: src/styles/responsive.css
+   Purpose: Mobile-first responsive utilities
+   ============================================= */
+:root {
+  --container-max: 1100px;
+  --gap-xs: 0.5rem;
+  --gap-sm: 0.75rem;
+  --gap-md: 1rem;
+  --gap-lg: 1.5rem;
+  --gap-xl: 2rem;
+
+  /* Breakpoints */
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+}
+
+/* Container */
+.container {
+  width: 100%;
+  margin: 0 auto;
+  padding-inline: 1rem;
+  max-width: var(--container-max);
+}
+
+/* Stack spacing (vertical rhythm) */
+.stack > * + * { margin-top: var(--gap-md); }
+.stack-sm > * + * { margin-top: var(--gap-sm); }
+.stack-md > * + * { margin-top: var(--gap-lg); }
+.stack-lg > * + * { margin-top: var(--gap-xl); }
+
+/* Simple grid utilities */
+.grid { display: grid; gap: var(--gap-md); }
+.cols-1 { grid-template-columns: 1fr; }
+.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* Responsive helpers */
+@media (max-width: var(--bp-md)) {
+  .md\:cols-1 { grid-template-columns: 1fr; }
+  .md\:cols-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: var(--bp-lg)) {
+  .lg\:cols-1 { grid-template-columns: 1fr; }
+  .lg\:cols-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Cards */
+.card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Helpful text sizing */
+.h1 { font-size: clamp(1.6rem, 2.5vw, 2.4rem); font-weight: 700; }
+.h2 { font-size: clamp(1.3rem, 2vw, 1.8rem); font-weight: 650; }
+.lead { font-size: clamp(1rem, 1.5vw, 1.125rem); line-height: 1.6; }
+
+/* Hide/show */
+.show-desktop { display: none; }
+.show-mobile { display: block; }
+@media (min-width: var(--bp-lg)) {
+  .show-desktop { display: block; }
+  .show-mobile { display: none; }
+}

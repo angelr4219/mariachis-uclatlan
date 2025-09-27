@@ -4,10 +4,12 @@
 // =============================================
 export const ADMIN_EMAILS: string[] = [
     'angelrocks0319@gmail.com',
-    
+    'angelr19@g.ucla.edu',
+    'angelr19@ucla.edu',
     'uclatlan@ucla.edu',
     'uclatlan@g.ucla.edu',
-    'enriquerodgon09@g.ucla.edu'
+    'enriquerodgon09@g.ucla.edu',
+    'andelapena1374@gmail.com',
     // add more admin emails here
   ];
   
@@ -18,7 +20,10 @@ export const ADMIN_EMAILS: string[] = [
     'angelr19@ucla.edu',
     'uclatlan@ucla.edu',
     'uclatlan@g.ucla.edu',
-    'enriquerodgon09@g.ucla.edu'
+    'enriquerodgon09@g.ucla.edu',
+    'andelapena1374@gmail.com',
+    ''
+
   ];
   
   export function isAdminEmail(email?: string | null) {

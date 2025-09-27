@@ -5,9 +5,11 @@ import './Carousel.css';
 import img1 from '../../assets/IMG_1055.jpg';
 import img2 from '../../assets/inauguration.jpg';
 import img3 from '../../assets/juliofrenk.jpg';
+import img4 from '../../assets/brandonPhoto.jpg';
+import img5 from '../../assets/rosebowl25.jpg'
 
 // If you want to pass images in via props later, keep internal default as a fallback
-const DEFAULT_IMAGES: string[] = [img1, img2, img3];
+const DEFAULT_IMAGES: string[] = [ img2, img3, img4, img5];
 
 export type CarouselProps = {
   images?: string[];

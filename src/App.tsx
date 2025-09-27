@@ -1,16 +1,22 @@
-
 // =============================================
-// FILE: src/App.tsx (clean, uses AdminOnly helper)
+// FILE: src/App.tsx
+// Purpose: Make the entire /members section a protected area using
+//          a single <ProtectedRoute> with nested child routes.
 // =============================================
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 
-// Pages
+// Pages (public)
 import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import BookUs from './pages/bookUs';
+import Join from './pages/joinUs';
+import HireUs from './pages/HireUs';
+
+// Members (protected)
 import MembersOnly from './pages/MembersOnly';
 import MembersProfile from './pages/Members/Profile';
 import MembersEvents from './pages/Members/Events';
@@ -18,15 +24,12 @@ import MembersResources from './pages/Members/Resources';
 import MembersSettings from './pages/Members/Settings';
 import PerformerAvailability from './pages/Members/PerformerAvailability';
 import Calendar from './pages/Members/Calendar';
-import BookUs from './pages/bookUs';
-import Join from './pages/joinUs';
-import HireUs from './pages/HireUs';
 
 // Dashboards
 import AdminDashboard from './adminComponents/adminDashboard';
 import PerformerDashboard from './performerComponents/PerformerDashboard';
 
-// Navbars
+// Navbars / layout bits
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import MembersNavbar from './components/MembersNavbar';
@@ -40,20 +43,26 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import AdminRoute from './routes/AdminRoute';
 import { isAdminEmail } from './config/roles';
 
-// Admin helper & pages
+// Admin helpers & pages
 import AdminOnly from './routes/AdminOnly';
-import AdminLayout from './layouts/AdminLayout'; // still used for the /admin root landing
+import AdminLayout from './layouts/AdminLayout';
 import AdminEvents from './pages/admin/AdminEvents';
 import AdminManageMembers from './adminComponents/AdminManageMembers';
 import AdminInquiries from './adminComponents/AdminInquiries';
 import ParticipationReport from './components/ParticipationReport';
 import Reports from './adminComponents/Reports.tsx';
+import Staff from './pages/people/Staff';
+import Musicians from './pages/people/Musicians';
+import Dancers from './pages/people/Dancers';
 
-// Role-based layout
+// Role-based landing
 import RoleBasedLayout from './rolebasedlayout/rbl';
 
-// Responsive globals (safe areas, grid utils)
+// Global styles
 import './styles/global.css';
+
+// --- Tiny wrapper so /members can nest all child routes under one ProtectedRoute ---
+const MembersLayout: React.FC = () => <Outlet />;
 
 const App: React.FC = () => {
   const [user, setUser] = React.useState<any>(null);
@@ -66,7 +75,6 @@ const App: React.FC = () => {
       if (currentUser) {
         const tokenResult = await getIdTokenResult(currentUser);
         setClaims(tokenResult.claims);
-        // console.debug('claims', tokenResult.claims);
       } else {
         setClaims(null);
       }
@@ -75,21 +83,21 @@ const App: React.FC = () => {
   }, []);
 
   const isAdmin = React.useMemo(() => isAdminEmail(user?.email ?? undefined), [user]);
-  const isMemberRoute = location.pathname.startsWith('/members');
-  const isDashboardRoute =
-    location.pathname.startsWith('/dashboard') ||
-    location.pathname.startsWith('/performer-dashboard') ||
-    location.pathname.startsWith('/admin');
-  const isAdminRoute = location.pathname.startsWith('/admin');
-  const isPerformerRoute = location.pathname.startsWith('/performer-dashboard');
+
+  // Page-type flags for which header to show
+  const path = location.pathname;
+  const isMemberRoute = path.startsWith('/members');
+  const isAdminRoute = path.startsWith('/admin');
+  const isPerformerRoute = path.startsWith('/performer-dashboard');
+  const isDashboardRoute = path.startsWith('/dashboard') || isPerformerRoute || isAdminRoute;
 
   return (
     <div className="app-shell">
-      {/* Role-aware headers */}
+      {/* Role-aware headers (Admin header renders inside AdminLayout) */}
       {!isMemberRoute && !isDashboardRoute && <Navbar />}
       {isMemberRoute && user && <MembersNavbar />}
-      {isAdminRoute && user && isAdmin && <AdminNavbar />}
       {isPerformerRoute && user && <PerformerNavbar />}
+      {isAdminRoute && user && isAdmin && <AdminNavbar />}
 
       <main className="container main stack" role="main">
         <Routes>
@@ -102,17 +110,29 @@ const App: React.FC = () => {
           <Route path="/book-us" element={<BookUs />} />
           <Route path="/hire-us" element={<HireUs />} />
           <Route path="/join" element={<Join />} />
+          <Route path="/staff" element={<Staff />} />
+          <Route path="/musicians" element={<Musicians />} />
+          <Route path="/dancers" element={<Dancers />} />
 
-          {/* Members */}
-          <Route path="/members" element={user ? <MembersOnly /> : <Navigate to="/login" replace />} />
-          <Route path="/members/profile" element={user ? <MembersProfile /> : <Navigate to="/login" replace />} />
-          <Route path="/members/events" element={user ? <MembersEvents /> : <Navigate to="/login" replace />} />
-          <Route path="/members/resources" element={user ? <MembersResources /> : <Navigate to="/login" replace />} />
-          <Route path="/members/settings" element={user ? <MembersSettings /> : <Navigate to="/login" replace />} />
-          <Route path="/members/performer-availability" element={user ? <PerformerAvailability /> : <Navigate to="/login" replace />} />
-          <Route path="/members/calendar" element={<Calendar />} />
+          {/* Members (all under ONE ProtectedRoute) */}
+          <Route
+            path="/members"
+            element={
+              <ProtectedRoute user={user}>
+                <MembersLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<MembersOnly />} />
+            <Route path="profile" element={<MembersProfile />} />
+            <Route path="events" element={<MembersEvents />} />
+            <Route path="resources" element={<MembersResources />} />
+            <Route path="settings" element={<MembersSettings />} />
+            <Route path="performer-availability" element={<PerformerAvailability />} />
+            <Route path="calendar" element={<Calendar />} />
+          </Route>
 
-          {/* Role-based landing */}
+          {/* Role-based landing (single route; removed duplicate) */}
           <Route
             path="/dashboard"
             element={
@@ -123,29 +143,36 @@ const App: React.FC = () => {
               />
             }
           />
+          <Route path="reports" element={<Reports />} />
+          
 
-          {/* Admin root landing still explicitly framed */}
+          {/* ADMIN — nested; AdminLayout itself renders the AdminNavbar once */}
           <Route
             path="/admin"
             element={
               <ProtectedRoute user={user}>
                 <AdminRoute isAdmin={isAdmin}>
-                  <AdminLayout>
-                    <AdminDashboard />
-                  </AdminLayout>
+                  <AdminLayout />
                 </AdminRoute>
               </ProtectedRoute>
             }
-          />
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="events" element={<AdminEvents />} />
+            <Route path="managemembers" element={<AdminManageMembers />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="inquiries" element={<AdminInquiries />} />
+            <Route path="participation" element={<ParticipationReport />} />
+          </Route>
+          <Route
+  path="/admin/participation"
+  element={
+          <ParticipationReport />
 
-          {/* Admin children via AdminOnly helper */}
-          <Route path="/admin/participation" element={<AdminOnly user={user} isAdmin={isAdmin}><ParticipationReport /></AdminOnly>} />
-          <Route path="/admin/inquiries" element={<AdminOnly user={user} isAdmin={isAdmin}><AdminInquiries /></AdminOnly>} />
-          <Route path="/admin/events" element={<AdminOnly user={user} isAdmin={isAdmin}><AdminEvents /></AdminOnly>} />
-          <Route path="/admin/managemembers" element={<AdminOnly user={user} isAdmin={isAdmin}><AdminManageMembers /></AdminOnly>} />
-          <Route path="/admin/reports" element={<AdminOnly user={user} isAdmin={isAdmin}><Reports /></AdminOnly>} />
+  }
+/>
 
-          {/* Performer-only */}
+          {/* Performer-only (simple protected leaf) */}
           <Route
             path="/performer-dashboard"
             element={
@@ -154,10 +181,13 @@ const App: React.FC = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* Catch-all → Home or 404 page if you add one */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
-      {!isMemberRoute && <Footer />}
+      {!isAdminRoute && <Footer />}
     </div>
   );
 };
@@ -169,4 +199,3 @@ const AppWrapper: React.FC = () => (
 );
 
 export default AppWrapper;
-

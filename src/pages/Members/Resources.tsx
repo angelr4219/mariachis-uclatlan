@@ -4,20 +4,32 @@ import React from 'react';
 
 const MembersResources: React.FC = () => {
   return (
-    <section className="ucla-content">
-      <h1 className="ucla-heading-xl">Exclusive Resources</h1>
-      <ul>
-        <li><strong>🎼 Sheet Music Library:</strong> Download music PDFs for all instrument sections.</li>
-        <li><strong>📅 Event Calendar:</strong> View all upcoming rehearsals and performances.</li>
-        <li><strong>✅ Attendance Tracker:</strong> Track participation and engagement.</li>
-        <li><strong>🎽 Uniform Policy:</strong> Guidelines for proper attire during performances.</li>
-        <li><strong>📝 Performance Agreements:</strong> Templates for external gigs including weddings and community events.</li>
-        <li><strong>📘 Member Handbook / Constitution:</strong> Details on expectations, leadership roles, auditions, and organizational structure.</li>
-        <li><strong>💸 Reimbursement Forms:</strong> Submit expenses for travel, uniforms, and gear.</li>
-        <li><strong>🧑‍🤝‍🧑 Member Directory:</strong> View private profiles with instrument, year, and contact info (opt-in only).</li>
-      </ul>
+    <section className="ucla-content" style={{ padding: '2rem' }}>
+      <h1 className="ucla-heading-xl" style={{ color: '#FFD100' }}>
+        🎼 Sheet Music Library
+      </h1>
+      <p style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>
+        Access PDF sheet music for each instrument section.
+      </p>
+      <a
+        href="https://ucla.box.com/s/l1aip4gbacfkgy80bf46cya0pj50tv77"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'inline-block',
+          padding: '1rem 2rem',
+          backgroundColor: '#2774AE',
+          color: '#fff',
+          textDecoration: 'none',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+        }}
+      >
+        Open Sheet Music Library →
+      </a>
     </section>
   );
-};
+}
 
 export default MembersResources;

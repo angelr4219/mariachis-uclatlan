@@ -1,14 +1,22 @@
-// src/layouts/AdminLayout.tsx
+
+
+// =============================================
+// FILE: src/layouts/AdminLayout.tsx
+// Purpose: Render Admin header ONCE and an Outlet for all admin pages
+// =============================================
 import React from 'react';
+import { Outlet } from 'react-router-dom';
 import AdminNavbar from '../adminComponents/adminNavbar';
 
 
-const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const AdminLayout: React.FC = () => {
 return (
-<>
+<div className="admin-shell">
 <AdminNavbar />
-<main className="ucla-container">{children}</main>
-</>
+<div className="admin-content">
+<Outlet />
+</div>
+</div>
 );
 };
 
