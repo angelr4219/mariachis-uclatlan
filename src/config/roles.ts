@@ -26,19 +26,17 @@ export const ADMIN_EMAILS: string[] = [
 
   ];
   
-  export function isAdminEmail(email?: string | null) {
-    if (!email) return false;
-    const e = email.toLowerCase();
-    return ADMIN_EMAILS.map((x) => x.toLowerCase()).includes(e);
-  }
-  
-  export function isPerformerEmail(email?: string | null) {
-    if (!email) return false;
-    const e = email.toLowerCase();
-    return (
-      isAdminEmail(email) ||
-      PERFORMER_EMAILS.map((x) => x.toLowerCase()).includes(e)
-    );
-  }
-  
-  
+
+// Check if the email is an admin (case‑insensitive)
+export const isAdminEmail = (email?: string): boolean => {
+  if (!email) return false;
+  const lowerEmail = email.toLowerCase();
+  return ADMIN_EMAILS.some((admin) => admin.toLowerCase() === lowerEmail);
+};
+
+// Check if the email is a performer (case‑insensitive)
+export const isPerformerEmail = (email?: string): boolean => {
+  if (!email) return false;
+  const lowerEmail = email.toLowerCase();
+  return PERFORMER_EMAILS.some((performer) => performer.toLowerCase() === lowerEmail);
+};

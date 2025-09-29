@@ -1,9 +1,8 @@
 // =============================================
 // FILE: src/App.tsx
-// Purpose: Make the entire /members section a protected area using
-//          a single <ProtectedRoute> with nested child routes.
-//          (Admin pages are temporarily unprotected by removing the AdminRoute.)
+// Purpose: Central route definition using a flexible ProtectedRoute.
 // =============================================
+
 import React from 'react';
 import {
   BrowserRouter as Router,
@@ -14,7 +13,7 @@ import {
   Outlet,
 } from 'react-router-dom';
 
-// Pages (public)
+// Public pages
 import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
@@ -24,7 +23,7 @@ import BookUs from './pages/bookUs';
 import Join from './pages/joinUs';
 import HireUs from './pages/HireUs';
 
-// Members (protected)
+// Member pages (protected)
 import MembersOnly from './pages/MembersOnly';
 import MembersProfile from './pages/Members/Profile';
 import MembersEvents from './pages/Members/Events';
@@ -37,32 +36,29 @@ import Calendar from './pages/Members/Calendar';
 import AdminDashboard from './adminComponents/adminDashboard';
 import PerformerDashboard from './performerComponents/PerformerDashboard';
 
-// Navbars / layout bits
+// Navbars & layout bits
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import MembersNavbar from './components/MembersNavbar';
 import AdminNavbar from './adminComponents/adminNavbar';
 import PerformerNavbar from './performerComponents/performerNavbar';
 
-// Debug component: displays user and admin status for testing
+// Debug helper
 import AdminDebug from './components/AdminDebug';
 
-// Auth / Roles
+// Auth & roles
 import { onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
 import { auth } from './firebase';
 import ProtectedRoute from './routes/ProtectedRoute';
-import AdminRoute from './routes/AdminRoute';
 import { isAdminEmail } from './config/roles';
 
 // Admin helpers & pages
-import AdminOnly from './routes/AdminOnly';
 import AdminLayout from './layouts/AdminLayout';
 import AdminEvents from './pages/admin/AdminEvents';
 import AdminManageMembers from './adminComponents/AdminManageMembers';
 import AdminInquiries from './adminComponents/AdminInquiries';
 import ParticipationReport from './components/ParticipationReport';
-// Import the new Reports page (admin reports) from the pages/admin folder
-import Reports from './adminComponents/Reports';
+import Reports from './adminComponents/Reports';  // Use the new Reports page
 import Staff from './pages/people/Staff';
 import Musicians from './pages/people/Musicians';
 import Dancers from './pages/people/Dancers';
@@ -70,10 +66,10 @@ import Dancers from './pages/people/Dancers';
 // Role-based landing
 import RoleBasedLayout from './rolebasedlayout/rbl';
 
-// Global styles
+// Styles
 import './styles/global.css';
 
-// --- Tiny wrapper so /members can nest all child routes under one ProtectedRoute ---
+// Wrapper for member routes
 const MembersLayout: React.FC = () => <Outlet />;
 
 const App: React.FC = () => {
@@ -94,25 +90,14 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  /*
-   * Determine if the current user is an admin. We first check for a custom
-   * claim (set via Firebase Cloud Functions) which is the preferred way to
-   * handle roles. If no claim exists, we fall back to checking the
-   * hard‑coded allowlist in roles.ts. We also normalize email casing to
-   * ensure case‑insensitive comparisons.
-   */
-  const isAdmin = React.useMemo(() => {
+  // Compute admin status (claim OR email allow‑list)
+  const isAdminUser = React.useMemo(() => {
     if (!user) return false;
-    // Use custom claim if present (e.g. { admin: true } or { role: 'admin' })
-    if (claims?.admin || claims?.role === 'admin') {
-      return true;
-    }
-    // Fallback to email allowlist (case‑insensitive)
-    const email = (user.email ?? '').toLowerCase();
-    return isAdminEmail(email);
+    if (claims?.admin || claims?.role === 'admin') return true;
+    return isAdminEmail(user.email ?? undefined);
   }, [user, claims]);
 
-  // Page-type flags for which header to show
+  // Determine route flags for navbars
   const path = location.pathname;
   const isMemberRoute = path.startsWith('/members');
   const isAdminRoute = path.startsWith('/admin');
@@ -121,15 +106,15 @@ const App: React.FC = () => {
 
   return (
     <div className="app-shell">
-      {/* Role-aware headers (Admin header renders inside AdminLayout) */}
+      {/* Show the appropriate navbar */}
       {!isMemberRoute && !isDashboardRoute && <Navbar />}
       {isMemberRoute && user && <MembersNavbar />}
       {isPerformerRoute && user && <PerformerNavbar />}
-      {isAdminRoute && user && isAdmin && <AdminNavbar />}
+      {/* AdminNavbar will be rendered inside the admin route below */}
 
       <main className="container main stack" role="main">
         <Routes>
-          {/* Public */}
+          {/* Public routes */}
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
@@ -142,7 +127,7 @@ const App: React.FC = () => {
           <Route path="/musicians" element={<Musicians />} />
           <Route path="/dancers" element={<Dancers />} />
 
-          {/* Members (all under ONE ProtectedRoute) */}
+          {/* Members (all under one ProtectedRoute) */}
           <Route
             path="/members"
             element={
@@ -160,7 +145,7 @@ const App: React.FC = () => {
             <Route path="calendar" element={<Calendar />} />
           </Route>
 
-          {/* Role-based landing (single route; removed duplicate) */}
+          {/* Role-based landing */}
           <Route
             path="/dashboard"
             element={
@@ -172,29 +157,30 @@ const App: React.FC = () => {
             }
           />
 
-{/* ADMIN — nested; AdminLayout itself renders the AdminNavbar once */}
-<Route
-  path="/admin/*"
-  element={
-    <ProtectedRoute user={user}>
-      {/* Inline admin check: render AdminLayout or redirect to dashboard */}
-      {isAdmin ? <AdminLayout /> : <Navigate to="/dashboard" replace />}
-    </ProtectedRoute>
-  }
->
-  <Route index element={<AdminDashboard />} />
-  <Route path="events" element={<AdminEvents />} />
-  <Route path="managemembers" element={<AdminManageMembers />} />
-  <Route path="reports" element={<Reports />} />
-  <Route path="inquiries" element={<AdminInquiries />} />
-  <Route path="participation" element={<ParticipationReport />} />
-</Route>
+          {/* ADMIN — nested: embed the AdminNavbar and AdminLayout */}
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute user={user} isAdminUser={isAdminUser} requiresAdmin>
+                <>
+                  <AdminNavbar />
+                  <AdminLayout />
+                </>
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="events" element={<AdminEvents />} />
+            <Route path="managemembers" element={<AdminManageMembers />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="inquiries" element={<AdminInquiries />} />
+            <Route path="participation" element={<ParticipationReport />} />
+          </Route>
 
-{/* Legacy path for direct participation URL */}
-<Route path="/admin/participation" element={<ParticipationReport />} />
+          {/* Legacy participation path (optional) */}
+          <Route path="/admin/participation" element={<ParticipationReport />} />
 
-
-          {/* Performer-only (simple protected leaf) */}
+          {/* Performer-only route */}
           <Route
             path="/performer-dashboard"
             element={
@@ -204,15 +190,16 @@ const App: React.FC = () => {
             }
           />
 
-          {/* Catch-all → Home or 404 page if you add one */}
+          {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
+      {/* Hide footer on admin pages */}
       {!isAdminRoute && <Footer />}
 
-      {/* Debug panel (only visible when user clicks the button). Remove or comment out in production. */}
-      <AdminDebug user={user} isAdmin={isAdmin} claims={claims} />
+      {/* Debug panel (optional) */}
+      <AdminDebug user={user} isAdmin={isAdminUser} claims={claims} />
     </div>
   );
 };
