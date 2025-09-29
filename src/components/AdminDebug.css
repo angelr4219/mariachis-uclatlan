@@ -1,0 +1,36 @@
+/*
+ * Styles for AdminDebug component
+ */
+ .admin-debug {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    text-align: right;
+  }
+  
+  .admin-debug-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    background: #343a40;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .admin-debug-btn:hover {
+    background: #23272b;
+  }
+  
+  .admin-debug-info {
+    margin-top: 0.5rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem;
+    border-radius: 4px;
+    color: #212529;
+    width: max-content;
+    max-width: 300px;
+    word-break: break-word;
+  }
