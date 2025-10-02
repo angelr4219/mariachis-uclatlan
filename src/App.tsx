@@ -51,6 +51,8 @@ import { onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
 import { auth } from './firebase';
 import ProtectedRoute from './routes/ProtectedRoute';
 import { isAdminEmail } from './config/roles';
+import AdminPassword from './pages/AdminPassword';
+
 
 // Admin helpers & pages
 import AdminLayout from './layouts/AdminLayout';
@@ -90,13 +92,16 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Compute admin status (claim OR email allow‑list)
+
+  const hasAdminPass = typeof window !== 'undefined' && localStorage.getItem('adminAccess') === 'true';
   const isAdminUser = React.useMemo(() => {
+    const hasAdminPass = typeof window !== 'undefined' && localStorage.getItem('adminAccess') === 'true';
+    if (hasAdminPass) return true;
     if (!user) return false;
     if (claims?.admin || claims?.role === 'admin') return true;
     return isAdminEmail(user.email ?? undefined);
-  }, [user, claims]);
-
+  }, [user, claims, location.pathname]); // pathname changes after /admin-password -> /admin
+  
   // Determine route flags for navbars
   const path = location.pathname;
   const isMemberRoute = path.startsWith('/members');
@@ -126,6 +131,9 @@ const App: React.FC = () => {
           <Route path="/staff" element={<Staff />} />
           <Route path="/musicians" element={<Musicians />} />
           <Route path="/dancers" element={<Dancers />} />
+          <Route path="/admin-password" element={<AdminPassword />} />
+
+
 
           {/* Members (all under one ProtectedRoute) */}
           <Route
@@ -156,7 +164,7 @@ const App: React.FC = () => {
               />
             }
           />
-
+          
           {/* ADMIN — nested: embed the AdminNavbar and AdminLayout */}
           <Route
             path="/admin/*"
