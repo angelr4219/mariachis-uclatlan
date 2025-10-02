@@ -13,6 +13,8 @@ var PROJECTID = "mduwebsite1345"
 var STORAGEBUCKET =  "mduwebsite1345.firebasestorage.app"
 var MESSAGINGSENDERID = "653256711691"
 var APPID =  "1:653256711691:web:5aca0f2e84ed19df90710e"
+var VITE_ADMIN_PASSWORD= 'chuy1345'
+
 
 const firebaseConfig = {
   apiKey: APIKEY,

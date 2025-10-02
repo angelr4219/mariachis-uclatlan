@@ -226,7 +226,7 @@ const RegisterForm: React.FC = () => {
         </div>
 
         <div className="field">
-          <label className="label" htmlFor="sectionCsv">Section(s) (optional, comma-separated)</label>
+          <label className="label" htmlFor="sectionCsv">Section(s) (comma-separated)</label>
           <input className="input" id="sectionCsv" name="sectionCsv" value={form.sectionCsv} onChange={handleChange} placeholder="violas, violins, harp, voces" />
         </div>
 
@@ -240,7 +240,7 @@ const RegisterForm: React.FC = () => {
         </div>
 
         <div className="field">
-          <label className="label" htmlFor="bio">Short Bio (optional)</label>
+          <label className="label" htmlFor="bio">Short Bio</label>
           <textarea className="input" id="bio" name="bio" value={form.bio} onChange={handleChange} placeholder="Tell us a little about your experience" rows={3} />
         </div>
 
