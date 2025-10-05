@@ -12,7 +12,7 @@ import {
   cancelEvent,
   deleteEventWithParticipation,
   type AdminEventWithTotals,
-} from '../services/adminEvents.ts';
+} from '../adminComponents/adminEvents';
 import { Timestamp } from 'firebase/firestore';
 
 const fmtDate = (t?: Timestamp | null) => {
@@ -95,13 +95,18 @@ const ParticipationReport: React.FC = () => {
           </summary>
 
           <div className="ev-actions">
-            <button onClick={() => publishEvent(ev.id)}>Publish</button>
-            <button onClick={() => hideEvent(ev.id)}>Hide</button>
-            <button onClick={() => cancelEvent(ev.id)}>Cancel</button>
-            <button className="danger" onClick={() => {
-              const ok = confirm('Delete event and all participation? This cannot be undone.');
-              if (ok) void deleteEventWithParticipation(ev.id).then(load);
-            }}>Delete</button>
+            <button onClick={() => publishEvent(ev.id).then(load)}>Publish</button>
+            <button onClick={() => hideEvent(ev.id).then(load)}>Hide</button>
+            <button onClick={() => cancelEvent(ev.id).then(load)}>Cancel</button>
+            <button
+              className="danger"
+              onClick={() => {
+                const ok = confirm('Delete event and all participation? This cannot be undone.');
+                if (ok) void deleteEventWithParticipation(ev.id).then(load);
+              }}
+            >
+              Delete
+            </button>
           </div>
 
           <div className="ev-financials">

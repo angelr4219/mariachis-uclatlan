@@ -1,0 +1,53 @@
+
+
+/* =============================================================
+   FILE: src/adminComponents/AdminManageMembers.css (UPDATED)
+   Adds: drawer, event cards, finalize toggle, small avatars
+   ============================================================= */
+
+.members-table { width: 100%; border-collapse: collapse; }
+.members-table th, .members-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+
+.perm-cell { display:flex; align-items:center; gap: 0.5rem; }
+.perm-label { color:#374151; font-size: 0.9rem; }
+
+/* Toggle */
+.toggle { width: 44px; height: 26px; border-radius: 999px; background: #e5e7eb; border:1px solid #d1d5db; position: relative; cursor: pointer; }
+.toggle.on { background:#2563eb; border-color:#2563eb; }
+.toggle .knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background:#fff; transition: transform 0.18s ease; }
+.toggle.on .knob { transform: translateX(18px); }
+
+/* Drawer */
+.drawer { position: fixed; inset: 0; display:none; }
+.drawer.open { display:block; }
+.drawer-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.35); }
+.drawer-panel { position: absolute; top:0; right:0; width: min(720px, 100%); height:100%; background:#fff; box-shadow: -8px 0 24px rgba(0,0,0,0.15); display:flex; flex-direction: column; }
+.drawer-head { padding: 14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
+.drawer-title { display:flex; align-items:center; gap:0.75rem; }
+
+.avatar.sm img, .avatar.sm .avatar-placeholder { width: 40px; height: 40px; border-radius: 8px; border:1px solid #e5e7eb; background:#f3f4f6; display:flex; align-items:center; justify-content:center; font-weight:600; color:#6b7280; }
+
+.drawer-body { padding: 16px; overflow:auto; }
+
+/* Event cards in drawer */
+.event-list { display: grid; gap: 0.75rem; }
+.event-card { border:1px solid #e5e7eb; border-radius: 12px; padding: 0.9rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.event-head { display:flex; align-items:center; justify-content:space-between; gap: 0.5rem; }
+.status-pill { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 6px; text-transform: capitalize; background:#eef2ff; color:#3730a3; white-space: nowrap; }
+.status-pill.published { background:#dcfce7; color:#065f46; }
+.status-pill.draft { background:#fee2e2; color:#991b1b; }
+.status-pill.cancelled { background:#e5e7eb; color:#374151; }
+
+.event-meta { margin-top: 0.5rem; display:grid; gap: 0.25rem; }
+.meta-row { display: grid; grid-template-columns: 64px 1fr; gap: 0.5rem; align-items: baseline; }
+.meta-row dt { color:#6b7280; font-weight: 600; }
+.meta-row dd { margin: 0; color:#111827; }
+
+.event-actions { margin-top: 0.6rem; display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap; }
+select { padding: 0.5rem 0.6rem; border-radius: 8px; border:1px solid #d1d5db; background:#fff; }
+.btn { padding: 0.45rem 0.8rem; border-radius: 8px; border:1px solid #d1d5db; background:#fff; cursor:pointer; }
+.btn-light { background:#f9fafb; }
+.btn-primary { padding: 0.5rem 0.9rem; border-radius: 8px; border: 1px solid #2563eb; background: #2563eb; color: #fff; font-weight: 600; cursor: pointer; }
+
+.finalize-toggle { display:inline-flex; align-items:center; gap:0.4rem; user-select:none; }
+.finalized-note { margin-top: 0.25rem; font-size: 0.9rem; color:#065f46; }

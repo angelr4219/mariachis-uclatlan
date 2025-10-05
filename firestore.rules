@@ -1,106 +1,139 @@
+// =============================================
 // FILE: firestore.rules
+// =============================================
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ----------------- Helpers -----------------
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // users/{uid} document contains roles: ["admin", ...]
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Fetch user doc once
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Array-safe roles getter (returns [] if missing)
+    function rolesArray() {
+      return (userDoc().data.roles is list) ? userDoc().data.roles : [];
+    }
+
     function isAdmin() {
-  return isSignedIn()
-    && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-    && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles is list)
-    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
-}
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && ("admin" in rolesArray());
+    }
 
-    // Safely check array membership (works if roles is missing/null)
     function rolesHas(role) {
-      return isSignedIn() &&
-             role in (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
-                      || []);
+      return isSignedIn() && (role in rolesArray());
     }
 
-    // ---------- users ----------
+    // ----------------- users -----------------
     match /users/{uid} {
-      // Anyone signed in can read basic profiles (loosen/tighten as you prefer)
+      // Anyone signed-in can read basic profiles (tighten if needed)
       allow read: if isSignedIn();
-      // Only the owner can write their own profile (or admin)
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+      // Only owner or admin can write
+      allow write: if isAdmin() || isSelf(uid);
     }
 
-    // ---------- events ----------
+    // ----------------- events -----------------
     match /events/{eventId} {
-      // Allow listing/reading only if event is published (or admin).
-      // IMPORTANT: For queries you must include where('status','==','published'),
-      // otherwise reads will be denied.
+      // Reads allowed if admin OR the event itself is published.
+      // For queries: Firestore evaluates this per-document returned, so this is fine.
       allow get, list: if isAdmin() || (resource.data.status == 'published');
 
       // Admin manages events
       allow create, update, delete: if isAdmin();
 
-      // ---------- availability subcollection ----------
+      // ---- availability subcollection (per-event) ----
       match /availability/{uid} {
-        // Owners can read/write their own availability; admins can read all.
-        allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
-        allow write: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+        // Read: owner or admin
+        allow read: if isAdmin() || isSelf(uid);
+
+        // Write: owner (performer) or admin
+        allow write: if isAdmin() || isSelf(uid);
+
+        // Optional stricter validator (uncomment to enforce payload shape on create/update):
+        // allow create, update: if (isAdmin() || isSelf(uid)) &&
+        //   request.resource.data.status in ['yes','maybe','no'] &&
+        //   (!('eventId' in request.resource.data) || request.resource.data.eventId is string) &&
+        //   (!('eventTitle' in request.resource.data) || request.resource.data.eventTitle is string) &&
+        //   (!('eventStart' in request.resource.data) || request.resource.data.eventStart is timestamp || request.resource.data.eventStart == null) &&
+        //   (!('eventEnd' in request.resource.data) || request.resource.data.eventEnd is timestamp || request.resource.data.eventEnd == null) &&
+        //   (!('eventLocation' in request.resource.data) || request.resource.data.eventLocation is string || request.resource.data.eventLocation == null);
       }
     }
 
-    // (Optional) top-level availability fallback used by your AdminReports fallback:
+    // ----------------- (Optional) top-level availability -----------------
+    // If you aren't using this collection, you can delete this block.
     match /availability/{docId} {
-      // Admin-only by default; performers write only under events/{id}/availability/{uid}
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
-    // ---------- inquiries ----------
-// Public can CREATE an inquiry (no auth required), but only admins can read or modify.
-match /inquiries/{inquiryId} {
-  allow create: if
-    // required
-    request.resource.data.name is string &&
-    request.resource.data.email is string &&
 
-    // optional top-level strings
-    (!('phone' in request.resource.data) || request.resource.data.phone is string) &&
-    (!('org' in request.resource.data) || request.resource.data.org is string) &&
-    (!('message' in request.resource.data) || request.resource.data.message is string) &&
+    // ----------------- inquiries -----------------
+    // Public can CREATE; only admins can read/modify.
+    match /inquiries/{inquiryId} {
+      allow create: if
+        // required
+        request.resource.data.name is string &&
+        request.resource.data.email is string &&
 
-    // optional nested event map
-    (!('event' in request.resource.data) ||
-      (request.resource.data.event is map &&
-       (!('title' in request.resource.data.event) || request.resource.data.event.title is string) &&
-       (!('date' in request.resource.data.event) || request.resource.data.event.date is string) &&
-       (!('start' in request.resource.data.event) || request.resource.data.event.start is string) &&
-       (!('end' in request.resource.data.event) || request.resource.data.event.end is string) &&
-       (!('location' in request.resource.data.event) || request.resource.data.event.location is string)
-      )
-    ) &&
+        // optional top-level strings
+        (!('phone' in request.resource.data) || request.resource.data.phone is string) &&
+        (!('org' in request.resource.data) || request.resource.data.org is string) &&
+        (!('message' in request.resource.data) || request.resource.data.message is string) &&
 
-    // optional meta map (allow simple strings only)
-    (!('meta' in request.resource.data) ||
-      (request.resource.data.meta is map &&
-       request.resource.data.meta.keys().hasOnly(['userAgent', 'tz']) &&
-       (!('userAgent' in request.resource.data.meta) || request.resource.data.meta.userAgent is string) &&
-       (!('tz' in request.resource.data.meta) || request.resource.data.meta.tz is string)
-      )
-    ) &&
+        // optional nested event map
+        (!('event' in request.resource.data) ||
+          (request.resource.data.event is map &&
+           (!('title' in request.resource.data.event) || request.resource.data.event.title is string) &&
+           (!('date' in request.resource.data.event) || request.resource.data.event.date is string) &&
+           (!('start' in request.resource.data.event) || request.resource.data.event.start is string) &&
+           (!('end' in request.resource.data.event) || request.resource.data.event.end is string) &&
+           (!('location' in request.resource.data.event) || request.resource.data.event.location is string)
+          )
+        ) &&
 
-    // optional serverManaged fields
-    (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp) &&
-    (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
+        // optional meta map (simple keys only)
+        (!('meta' in request.resource.data) ||
+          (request.resource.data.meta is map &&
+           request.resource.data.meta.keys().hasOnly(['userAgent', 'tz']) &&
+           (!('userAgent' in request.resource.data.meta) || request.resource.data.meta.userAgent is string) &&
+           (!('tz' in request.resource.data.meta) || request.resource.data.meta.tz is string)
+          )
+        ) &&
 
-    // restrict status if client sets it
-    (!('status' in request.resource.data) || request.resource.data.status in ['new','in_progress','closed']) &&
+        // optional server-managed fields ok if present and types correct
+        (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp) &&
+        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
 
-    // simple size guards
-    request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200 &&
-    request.resource.data.email.size() > 0 && request.resource.data.email.size() <= 320 &&
-    (!('message' in request.resource.data) || request.resource.data.message.size() <= 5000);
+        // optional status if client sets it
+        (!('status' in request.resource.data) || request.resource.data.status in ['new','in_progress','closed']) &&
 
-  allow get, list, update, delete: if isAdmin();
-}
+        // simple size guards
+        request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200 &&
+        request.resource.data.email.size() > 0 && request.resource.data.email.size() <= 320 &&
+        (!('message' in request.resource.data) || request.resource.data.message.size() <= 5000);
 
+      allow get, list, update, delete: if isAdmin();
+    }
+
+    // ----------------- availability_responses (flat mirror) -----------------
+    match /availability_responses/{docId} {
+      // Writers: signed-in user can write only their own record
+      allow write: if isSignedIn()
+                   && request.resource.data.uid == request.auth.uid
+                   // optionally enforce status and types:
+                   && request.resource.data.status in ['yes','maybe','no'];
+
+      // Reads: admins can read everything; performers can read only their own docs
+      allow get: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow list: if isAdmin(); // listing/filtering for reports; performers shouldn't list others
+    }
   }
 }

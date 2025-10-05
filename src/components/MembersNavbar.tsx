@@ -23,12 +23,13 @@ const MembersNavbar: React.FC = () => {
         <li><NavLink to="/members/settings" className={cls}>Settings</NavLink></li>
 
         {/* Admin unlock prompt (public route) */}
-        <li><NavLink to="/admin-password" className={cls}>Admin</NavLink></li>
+        
 
         {/* Divider for dashboards */}
         <li className="divider" />
         {/* If you want a quick link to the real admin area use /admin, not /admin-dashboard */}
-        <li><NavLink to="/admin" className={cls}>Admin Dashboard</NavLink></li>
+        <li><NavLink to="/admin-password" className={cls}>Admin</NavLink></li>
+        {/*<li><NavLink to="/admin" className={cls}>Admin Dashboard</NavLink></li>    this will be used once ready*/}
 
         {/* Back to public site */}
         <li><NavLink to="/" className={cls}>Public Site</NavLink></li>

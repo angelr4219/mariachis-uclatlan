@@ -1,0 +1,15 @@
+
+/* FILE: src/pages/admin/PerformanceDaySetup.css */
+.perf-setup { max-width: 1100px; margin: 0 auto; }
+.bar { display: flex; gap: 1rem; align-items: end; margin: .75rem 0 1rem; }
+.bar select { padding: .5rem .6rem; border: 1px solid #cbd5e1; border-radius: 8px; }
+.grid-table { width: 100%; border-collapse: collapse; }
+.grid-table thead th { text-align: left; border-bottom: 1px solid #e5e7eb; padding: .5rem .25rem; }
+.grid-table tbody td { border-top: 1px solid #f3f4f6; padding: .5rem .25rem; vertical-align: middle; }
+.pill { display:inline-block; padding:.15rem .45rem; border-radius:999px; font-weight:600; font-size:.85rem; }
+.pill.yes { background:#bbf7d0; }
+.pill.maybe { background:#fde68a; }
+.pill.no { background:#fecaca; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:.9rem; }
+.btn { display:inline-block; border:none; border-radius:10px; padding:.45rem .8rem; cursor:pointer; font-weight:600; }
+.btn.primary { background:#2774AE; color:#fff; }
