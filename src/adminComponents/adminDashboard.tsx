@@ -1,23 +1,20 @@
-
 // =============================================
 // FILE: src/components/Admin/AdminDashboard.tsx
-// Purpose: Admin dashboard with real Firestore-backed stats
-// Notes:
-//  - Upcoming Events: events with status==='published' and start >= now (small past buffer)
-//  - Pending Requests: inquiries that are not yet pushed (pushed==false) OR status!='closed'
-//  - Performers Confirmed: availability_responses with status==='yes' and eventStart >= now-1d
+// Purpose: Admin dashboard with Firestore-backed stats (permission-safe)
 // =============================================
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import './AdminDashboard.css';
-import { db } from '../firebase';
+
+import { auth, db } from '../firebase'; // <- fix relative path
+import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
   getDocs,
   query,
   where,
   Timestamp,
-  CollectionReference,
+  type CollectionReference,
 } from 'firebase/firestore';
 
 // Helpers
@@ -25,71 +22,118 @@ const toDate = (v: any): Date | undefined => {
   if (!v) return undefined;
   if (v instanceof Date) return v;
   if (v instanceof Timestamp) return v.toDate();
-  try {
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? undefined : d;
-  } catch {
-    return undefined;
-  }
+  try { const d = new Date(v); return isNaN(d.getTime()) ? undefined : d; } catch { return undefined; }
 };
 
+const StatCard: React.FC<{label: string; value: number | string; loading?: boolean; error?: string | null}> = ({label, value, loading, error}) => (
+  <div className="stat-card" aria-live="polite">
+    <div className="stat-value">
+      {loading ? '…' : error ? '!' : value}
+    </div>
+    <div className="stat-label">
+      {loading ? 'Loading…' : error ? error : label}
+    </div>
+  </div>
+);
+
 const AdminDashboard: React.FC = () => {
+  const [authed, setAuthed] = React.useState(false);
+
+  // Stats
   const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState<string | null>(null);
-  const [upcomingEvents, setUpcomingEvents] = React.useState(0);
-  const [pendingRequests, setPendingRequests] = React.useState(0);
-  const [performersConfirmed, setPerformersConfirmed] = React.useState(0);
+  const [pageErr, setPageErr] = React.useState<string | null>(null);
+
+  const [upcomingEvents, setUpcomingEvents] = React.useState<number | string>('—');
+  const [pendingRequests, setPendingRequests] = React.useState<number | string>('—');
+  const [performersConfirmed, setPerformersConfirmed] = React.useState<number | string>('—');
+
+  const [errUpcoming, setErrUpcoming] = React.useState<string | null>(null);
+  const [errPending, setErrPending] = React.useState<string | null>(null);
+  const [errConfirmed, setErrConfirmed] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setAuthed(!!u));
+    return () => unsub();
+  }, []);
+
+  React.useEffect(() => {
+    if (!authed) return;
+
     const load = async () => {
-      setLoading(true); setErr(null);
+      setLoading(true);
+      setPageErr(null);
+      setErrUpcoming(null);
+      setErrPending(null);
+      setErrConfirmed(null);
+
+      const nowMs = Date.now();
+      const oneDayAgo = new Date(nowMs - 24 * 60 * 60 * 1000);
+
+      // --- Upcoming Events (published, start >= now - 2h) ---
+      const loadUpcoming = (async () => {
+        try {
+          const evCol = collection(db, 'events') as CollectionReference;
+          const evQ = query(evCol, where('status', '==', 'published'));
+          const snap = await getDocs(evQ);
+          const count = snap.docs.filter((d) => {
+            const s = toDate((d.data() as any).start)?.getTime();
+            return typeof s === 'number' ? s >= nowMs - 2 * 60 * 60 * 1000 : false;
+          }).length;
+          setUpcomingEvents(count);
+        } catch (e: any) {
+          // Permission denied or other errors
+          setUpcomingEvents('—');
+          setErrUpcoming(e?.code === 'permission-denied' ? 'No permission' : 'Error');
+        }
+      })();
+
+      // --- Pending Requests (inquiries) ---
+      const loadPending = (async () => {
+        try {
+          const inqCol = collection(db, 'inquiries') as CollectionReference;
+          const inqSnap = await getDocs(inqCol);
+          const pending = inqSnap.docs.filter((d) => {
+            const x = d.data() as any;
+            if (typeof x.pushed === 'boolean') return x.pushed === false;
+            return x.status !== 'closed';
+          }).length;
+          setPendingRequests(pending);
+        } catch (e: any) {
+          setPendingRequests('—');
+          setErrPending(e?.code === 'permission-denied' ? 'No permission' : 'Error');
+        }
+      })();
+
+      // --- Performers Confirmed (availability_responses) ---
+      const loadConfirmed = (async () => {
+        try {
+          const flatCol = collection(db, 'availability_responses') as CollectionReference;
+          const flatQ = query(flatCol, where('status', '==', 'yes')); // date filtered client-side
+          const flatSnap = await getDocs(flatQ);
+          const confirmed = flatSnap.docs.filter((d) => {
+            const x = d.data() as any;
+            const es = toDate(x.eventStart);
+            return es ? es >= oneDayAgo : false;
+          }).length;
+          setPerformersConfirmed(confirmed);
+        } catch (e: any) {
+          setPerformersConfirmed('—');
+          setErrConfirmed(e?.code === 'permission-denied' ? 'No permission' : 'Error');
+        }
+      })();
+
       try {
-        const nowMs = Date.now();
-        const oneDayAgo = new Date(nowMs - 24 * 60 * 60 * 1000);
-
-        // --- Upcoming Events ---
-        const evCol = collection(db, 'events') as CollectionReference;
-        const evQ = query(evCol, where('status', '==', 'published'));
-        const evSnap = await getDocs(evQ);
-        const upcoming = evSnap.docs.filter((d) => {
-          const data = d.data() as any;
-          const s = toDate(data.start)?.getTime();
-          return typeof s === 'number' ? s >= nowMs - 2 * 60 * 60 * 1000 : false; // small 2h buffer
-        }).length;
-        setUpcomingEvents(upcoming);
-
-        // --- Pending Requests (inquiries) ---
-        const inqCol = collection(db, 'inquiries') as CollectionReference;
-        // Pull all recent-ish; if you have many, consider filtering by createdAt >= last 90d
-        const inqSnap = await getDocs(inqCol);
-        const pending = inqSnap.docs.filter((d) => {
-          const x = d.data() as any;
-          // If a boolean pushed flag exists, use it; otherwise, use status != 'closed'
-          if (typeof x.pushed === 'boolean') return x.pushed === false;
-          return x.status !== 'closed';
-        }).length;
-        setPendingRequests(pending);
-
-        // --- Performers Confirmed ---
-        const flatCol = collection(db, 'availability_responses') as CollectionReference;
-        // Single-field filter; remaining date filter is client-side to avoid composite idx
-        const flatQ = query(flatCol, where('status', '==', 'yes'));
-        const flatSnap = await getDocs(flatQ);
-        const confirmed = flatSnap.docs.filter((d) => {
-          const x = d.data() as any;
-          const es = toDate(x.eventStart);
-          return es ? es >= oneDayAgo : false; // count recent/upcoming confirmations
-        }).length;
-        setPerformersConfirmed(confirmed);
+        await Promise.all([loadUpcoming, loadPending, loadConfirmed]);
       } catch (e: any) {
-        console.error('[AdminDashboard] Failed to load stats', e);
-        setErr(e?.message || 'Failed to load stats');
+        // This only triggers if something outside the per-stat try/catch explodes
+        setPageErr(e?.message || 'Failed to load stats');
       } finally {
         setLoading(false);
       }
     };
+
     load();
-  }, []);
+  }, [authed]);
 
   const cards = [
     {
@@ -156,27 +200,12 @@ const AdminDashboard: React.FC = () => {
       </header>
 
       <section className="admin-stats" aria-label="Quick Stats">
-        {loading ? (
-          <div className="stat-card"><div className="stat-value">…</div><div className="stat-label">Loading…</div></div>
-        ) : err ? (
-          <div className="stat-card"><div className="stat-value">!</div><div className="stat-label">{err}</div></div>
-        ) : (
-          <>
-            <div className="stat-card">
-              <div className="stat-value">{upcomingEvents}</div>
-              <div className="stat-label">Upcoming Events</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{pendingRequests}</div>
-              <div className="stat-label">Pending Requests</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{performersConfirmed}</div>
-              <div className="stat-label">Performers Confirmed</div>
-            </div>
-          </>
-        )}
+        <StatCard label="Upcoming Events" value={upcomingEvents} loading={loading} error={errUpcoming} />
+        <StatCard label="Pending Requests" value={pendingRequests} loading={loading} error={errPending} />
+        <StatCard label="Performers Confirmed" value={performersConfirmed} loading={loading} error={errConfirmed} />
       </section>
+
+      {pageErr && <p className="admin-sub" style={{color:'#b91c1c'}}>{pageErr}</p>}
 
       <section className="admin-grid" aria-label="Admin Navigation">
         {cards.map((c) => (

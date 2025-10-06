@@ -3,9 +3,10 @@
 // Description: Member profile page using services/profile.ts + Storage avatar upload
 //              PLUS a list of events this member agreed to (status == "yes"),
 //              matched by their email in the flat `availability` collection.
-// - Keeps your existing services/profile.ts contract (getProfile / upsertProfile)
-// - Uses Firebase Storage for avatar, then persists photoURL to users profile
-// - Clean card layout + responsive grid + inline banners (no alerts)
+// Updates:
+//  - Accepted events now **live update** via Firestore onSnapshot
+//  - Refetch occurs every time you navigate to this page (component mount)
+//  - Keeps prior behavior and styles
 // =============================================
 import React, { useEffect, useMemo, useState } from 'react';
 import './Profile.css';
@@ -21,7 +22,10 @@ import {
   where,
   type CollectionReference,
   Timestamp,
+  onSnapshot,
+  type DocumentData,
 } from 'firebase/firestore';
+import { useLocation } from 'react-router-dom';
 
 // ---------- Helpers ----------
 const emptyProfile = (uid: string, email: string | null): UserProfile => ({
@@ -47,10 +51,7 @@ const toDate = (v: any): Date | null => {
   if (!v) return null;
   if (v instanceof Date) return v;
   if (v instanceof Timestamp) return v.toDate();
-  try {
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? null : d;
-  } catch { return null; }
+  try { const d = new Date(v); return isNaN(d.getTime()) ? null : d; } catch { return null; }
 };
 
 const fmtRange = (start: any, end: any): string => {
@@ -81,6 +82,7 @@ const Profile: React.FC = () => {
   const user = auth.currentUser; // route should protect this; may be null at first paint
   const uid = user?.uid ?? '';
   const email = user?.email ?? '';
+  const location = useLocation(); // ensures mount effect runs when navigating here
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,11 +93,11 @@ const Profile: React.FC = () => {
 
   const [banner, setBanner] = useState<null | { type: 'success' | 'error'; text: string }>(null);
 
-  // Events the member said "yes" to (matched by email, as requested)
+  // Events the member said "yes" to (matched by email)
   const [accepted, setAccepted] = useState<AcceptedRow[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
-  // ---------- Load profile ----------
+  // ---------- Load profile (on mount / route enter) ----------
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -114,39 +116,37 @@ const Profile: React.FC = () => {
       }
     })();
     return () => { alive = false; };
-  }, [uid, user?.email]);
+  // include location.key so re-entering the page triggers a fresh load
+  }, [uid, user?.email, location.key]);
 
-  // ---------- Load accepted events (status=="yes" by email) ----------
+  // ---------- Accepted events (live subscription) ----------
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!email) { setLoadingEvents(false); return; }
-      setLoadingEvents(true);
-      try {
-        const col = collection(db, 'availability') as CollectionReference;
-        const qRef = query(col, where('email', '==', email), where('status', '==', 'yes'));
-        const snap = await getDocs(qRef);
-        if (!alive) return;
-        const rows: AcceptedRow[] = snap.docs.map((d) => {
-          const data: any = d.data();
-          return {
-            id: d.id,
-            eventId: data.eventId,
-            eventTitle: data.eventTitle || 'Untitled Event',
-            eventStart: toDate(data.eventStart),
-            eventEnd: toDate(data.eventEnd),
-            eventLocation: data.eventLocation ?? null,
-          };
-        });
-        rows.sort((a, b) => (a.eventStart?.getTime() ?? 0) - (b.eventStart?.getTime() ?? 0));
-        if (alive) setAccepted(rows);
-      } catch (e) {
-        console.error('[Accepted events]', e);
-      } finally {
-        if (alive) setLoadingEvents(false);
-      }
-    })();
-    return () => { alive = false; };
+    if (!email) { setAccepted([]); setLoadingEvents(false); return; }
+    setLoadingEvents(true);
+
+    const col = collection(db, 'availability') as CollectionReference;
+    const qRef = query(col, where('email', '==', email), where('status', '==', 'yes'));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const rows: AcceptedRow[] = snap.docs.map((d) => {
+        const data = d.data() as DocumentData;
+        return {
+          id: d.id,
+          eventId: data.eventId,
+          eventTitle: data.eventTitle || 'Untitled Event',
+          eventStart: toDate(data.eventStart),
+          eventEnd: toDate(data.eventEnd),
+          eventLocation: data.eventLocation ?? null,
+        };
+      }).sort((a, b) => (a.eventStart?.getTime() ?? 0) - (b.eventStart?.getTime() ?? 0));
+      setAccepted(rows);
+      setLoadingEvents(false);
+    }, (err) => {
+      console.error('[Accepted events]', err);
+      setAccepted([]);
+      setLoadingEvents(false);
+    });
+
+    return () => unsub();
   }, [email]);
 
   // ---------- Handlers ----------
@@ -159,7 +159,6 @@ const Profile: React.FC = () => {
     const file = e.target.files?.[0] || null;
     setAvatarFile(file);
     if (file) {
-      // Show a quick preview
       const next = URL.createObjectURL(file);
       setP((prev) => (prev ? { ...prev, photoURL: next } : prev));
     }
@@ -180,30 +179,13 @@ const Profile: React.FC = () => {
     setError('');
     setBanner(null);
     try {
-      // 1) Avatar upload
       const avatarURL = await uploadAvatarIfNeeded();
-
-      // 2) Normalize instruments (comma CSV → array)
       const csv = (p as any)._instrumentsCSV as string | undefined;
       const instruments = csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : (p.instruments || []);
-
-      // 3) Build payload
-      const payload: Partial<UserProfile> = {
-        ...p,
-        instruments,
-        ...(avatarURL ? { photoURL: avatarURL } : {}),
-      };
-
-      // 4) Upsert profile doc
+      const payload: Partial<UserProfile> = { ...p, instruments, ...(avatarURL ? { photoURL: avatarURL } : {}) };
       await upsertProfile(uid, payload);
-
-      // 5) Sync Auth display/photo
       const displayName = p.name || user?.displayName || undefined;
-      await updateAuthProfile(auth.currentUser!, {
-        displayName,
-        photoURL: avatarURL ?? p.photoURL ?? undefined,
-      });
-
+      await updateAuthProfile(auth.currentUser!, { displayName, photoURL: avatarURL ?? p.photoURL ?? undefined });
       setEditMode(false);
       setP({ ...p, instruments, ...(avatarURL ? { photoURL: avatarURL } : {}) });
       setBanner({ type: 'success', text: 'Profile saved. Thank you!' });
@@ -379,7 +361,7 @@ const Profile: React.FC = () => {
         {error && <p className="error">{error}</p>}
       </div>
 
-      {/* Accepted events section */}
+      {/* Accepted events section (live) */}
       <h2 className="section-title">Events I’m Playing (Yes)</h2>
       {loadingEvents && <p className="muted">Loading your events…</p>}
       <div className="accepted-list">
@@ -405,4 +387,3 @@ const Profile: React.FC = () => {
 };
 
 export default Profile;
-

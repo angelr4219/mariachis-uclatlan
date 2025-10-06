@@ -1,10 +1,9 @@
 // =============================================
 // FILE: src/pages/Members/PerformerAvailability.tsx
-// Description: Cleaner layout for performer RSVP with inline success/error banners.
-// - Keeps Firestore read/write behavior identical
-// - Replaces window.alerts with accessible inline banners
-// - Improves card layout, spacing, and responsive grid
-// - NEW: respects admin-finalized RSVPs (locks select + submit when finalized)
+// Fixes: reliable success/error messaging, optimistic UI, tiny UX polish
+// + NEW: Bulk apply — set your availability for ALL listed events in one click
+//    - Skips events that are admin-finalized (locked)
+//    - Mirrors writes to `availability_responses` and `availability`
 // =============================================
 import React from 'react';
 import type { ChangeEvent } from 'react';
@@ -18,7 +17,6 @@ import {
   Timestamp,
   serverTimestamp,
   query,
-  CollectionReference,
 } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../../firebase';
@@ -44,9 +42,7 @@ const toDate = (v: any): Date | undefined => {
   try {
     const d = new Date(v);
     return isNaN(d.getTime()) ? undefined : d;
-  } catch {
-    return undefined;
-  }
+  } catch { return undefined; }
 };
 
 const toTimestamp = (v: any): Timestamp | null => {
@@ -58,11 +54,13 @@ const fmtRange = (start: any, end: any): string => {
   const s = toDate(start);
   const e = toDate(end);
   if (!s) return '';
-  const sStr = s.toLocaleString?.() || s.toISOString();
-  if (!e) return sStr;
+  const dateOpts: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+  const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+  if (!e) return `${s.toLocaleDateString(undefined, dateOpts)} ${s.toLocaleTimeString(undefined, timeOpts)}`;
   const sameDay = s.toDateString() === e.toDateString();
-  const eStr = sameDay ? e.toLocaleTimeString?.() : e.toLocaleString?.();
-  return `${sStr} → ${eStr}`;
+  const left = `${s.toLocaleDateString(undefined, dateOpts)} ${s.toLocaleTimeString(undefined, timeOpts)}`;
+  const right = sameDay ? e.toLocaleTimeString(undefined, timeOpts) : `${e.toLocaleDateString(undefined, dateOpts)} ${e.toLocaleTimeString(undefined, timeOpts)}`;
+  return `${left} → ${right}`;
 };
 
 // ---- Component ----
@@ -73,18 +71,16 @@ const PerformerAvailability: React.FC = () => {
   const [events, setEvents] = React.useState<EventItem[]>([]);
   const [availability, setAvailability] = React.useState<Record<string, AvailabilityStatus | ''>>({});
   const [saving, setSaving] = React.useState<Record<string, boolean>>({});
-  const [locked, setLocked] = React.useState<Record<string, boolean>>({}); // NEW: admin-finalized lock map
+  const [locked, setLocked] = React.useState<Record<string, boolean>>({});
 
-  // New: lightweight page-level banner for submit feedback
   const [banner, setBanner] = React.useState<null | { type: 'success' | 'error'; text: string }>(null);
+  const bannerTimer = React.useRef<number | null>(null);
 
-  // Load published events, then filter start>=now and sort client-side to avoid composite index
   React.useEffect(() => {
     const load = async () => {
       setError(null); setLoading(true);
       try {
-        const col = collection(db, 'events') as CollectionReference;
-        const qRef = query(col, where('status', '==', 'published'));// no orderBy here to avoid composite index
+        const qRef = query(collection(db, 'events'), where('status', '==', 'published'));
         const snap = await getDocs(qRef);
         const all: EventItem[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 
@@ -102,7 +98,6 @@ const PerformerAvailability: React.FC = () => {
 
         setEvents(upcoming);
 
-        // Pre-seed controlled state
         const seedAvail: Record<string, AvailabilityStatus | ''> = {};
         const seedLock: Record<string, boolean> = {};
         for (const ev of upcoming) { seedAvail[ev.id] = ''; seedLock[ev.id] = false; }
@@ -110,7 +105,6 @@ const PerformerAvailability: React.FC = () => {
         setLocked(seedLock);
 
         if (user) {
-          // Load existing RSVP docs sequentially (keeps writes minimal and easy to read)
           const entries: Record<string, AvailabilityStatus | ''> = { ...seedAvail };
           const locks: Record<string, boolean> = { ...seedLock };
           for (const ev of upcoming) {
@@ -132,7 +126,9 @@ const PerformerAvailability: React.FC = () => {
         setLoading(false);
       }
     };
-    load();
+    void load();
+
+    return () => { if (bannerTimer.current) window.clearTimeout(bannerTimer.current); };
   }, [user]);
 
   const onChange = (eventId: string, e: ChangeEvent<HTMLSelectElement>) => {
@@ -140,46 +136,89 @@ const PerformerAvailability: React.FC = () => {
     setAvailability((prev) => ({ ...prev, [eventId]: val }));
   };
 
+  const showSuccess = (text: string) => {
+    setBanner({ type: 'success', text });
+    if (bannerTimer.current) window.clearTimeout(bannerTimer.current);
+    bannerTimer.current = window.setTimeout(() => setBanner(null), 3500);
+  };
+
+  const showError = (text: string) => {
+    if (bannerTimer.current) window.clearTimeout(bannerTimer.current);
+    setBanner({ type: 'error', text });
+  };
+
+  // Shared writer for one event
+  const writeAvailability = async (eventId: string, status: AvailabilityStatus) => {
+    if (!user) throw new Error('no-auth');
+    const ev = events.find((x) => x.id === eventId);
+    const subRef = doc(db, 'events', eventId, 'availability', user.uid);
+    const payload = {
+      uid: user.uid,
+      displayName: user.displayName || user.email || 'Unknown',
+      email: user.email || null,
+      status, // 'yes' | 'maybe' | 'no'
+      updatedAt: serverTimestamp(),
+      eventId,
+      eventTitle: ev?.title || 'Untitled Event',
+      eventStart: toTimestamp(ev?.start),
+      eventEnd: toTimestamp(ev?.end),
+      eventLocation: ev?.location || null,
+      finalized: false,
+    } as const;
+    await setDoc(subRef, payload, { merge: true });
+    const flatId = `${eventId}_${user.uid}`;
+    await setDoc(doc(db, 'availability_responses', flatId), payload, { merge: true });
+    await setDoc(doc(db, 'availability', flatId), payload, { merge: true });
+  };
+
+  // NEW: Bulk apply to ALL (skips locked). Shows a summary banner.
+  const applyToAll = async (status: AvailabilityStatus) => {
+    if (!user) { showError('Please try again.'); return; }
+    const confirmText = `Apply \"${status.toUpperCase()}\" to all events? Locked (finalized) items will be skipped.`;
+    if (!window.confirm(confirmText)) return;
+
+    // Optimistic UI: set local state for unlocked events
+    setAvailability((prev) => {
+      const next = { ...prev } as Record<string, AvailabilityStatus | ''>;
+      for (const ev of events) {
+        if (!locked[ev.id]) next[ev.id] = status;
+      }
+      return next;
+    });
+
+    try {
+      let ok = 0, skipped = 0, failed = 0;
+      for (const ev of events) {
+        if (locked[ev.id]) { skipped++; continue; }
+        try { await writeAvailability(ev.id, status); ok++; }
+        catch { failed++; }
+      }
+      const parts = [] as string[];
+      if (ok) parts.push(`${ok} updated`);
+      if (skipped) parts.push(`${skipped} skipped`);
+      if (failed) parts.push(`${failed} failed`);
+      const msg = parts.length ? parts.join(' • ') : 'No changes';
+      if (failed) showError(`Done with issues — ${msg}`); else showSuccess(`Done — ${msg}.`);
+    } catch (e) {
+      console.error(e);
+      showError('Please try again.');
+    }
+  };
+
   const onSubmit = async (eventId: string) => {
-    if (!user) { setBanner({ type: 'error', text: 'Try again or re‑login.' }); return; }
-    if (locked[eventId]) { setBanner({ type: 'error', text: 'This RSVP was finalized by an admin.' }); return; }
+    if (!user) { showError('Please try again.'); return; }
+    if (locked[eventId]) { showError('This RSVP was finalized by an admin.'); return; }
 
     const status = (availability[eventId] || '') as AvailabilityStatus | '';
-    if (!status) { setBanner({ type: 'error', text: 'Please select an availability first.' }); return; }
+    if (!status) { showError('Please select an availability first.'); return; }
 
-    const ev = events.find((x) => x.id === eventId);
     setSaving((s) => ({ ...s, [eventId]: true }));
-    setBanner(null);
     try {
-      const subRef = doc(db, 'events', eventId, 'availability', user.uid);
-
-      // Rich payload for subcollection (keeps event snapshot + responder info)
-      const payload = {
-        uid: user.uid,
-        displayName: user.displayName || user.email || 'Unknown',
-        email: user.email || null,
-        status, // 'yes' | 'maybe' | 'no'
-        updatedAt: serverTimestamp(),
-        // Event snapshot (useful if title/time changes later)
-        eventId,
-        eventTitle: ev?.title || 'Untitled Event',
-        eventStart: toTimestamp(ev?.start), // Firestore Timestamp or null
-        eventEnd: toTimestamp(ev?.end),
-        eventLocation: ev?.location || null,
-        finalized: false, // members cannot finalize
-      } as const;
-
-      await setDoc(subRef, payload, { merge: true });
-
-      // Mirror to flat collections for admin reporting (keep both for compatibility)
-      const flatId = `${eventId}_${user.uid}`;
-      await setDoc(doc(db, 'availability_responses', flatId), payload, { merge: true });
-      await setDoc(doc(db, 'availability', flatId), payload, { merge: true });
-
-      setBanner({ type: 'success', text: 'Thank you — your response has been submitted.' });
-    } catch (e: any) {
+      await writeAvailability(eventId, status);
+      showSuccess('Thank you for submitting your availability.');
+    } catch (e) {
       console.error(e);
-      setBanner({ type: 'error', text: 'Something went wrong. Try again or re‑login.' });
+      showError('Please try again.');
     } finally {
       setSaving((s) => ({ ...s, [eventId]: false }));
     }
@@ -199,24 +238,24 @@ const PerformerAvailability: React.FC = () => {
       <h1 className="ucla-heading-xl">Performer Availability</h1>
 
       {banner && (
-        <div
-          className={`inline-banner ${banner.type}`}
-          role="status"
-          aria-live="polite"
-        >
+        <div className={`inline-banner ${banner.type}`} role="status" aria-live="polite">
           {banner.type === 'success' ? (
             <span className="banner-icon" aria-hidden>✓</span>
           ) : (
             <span className="banner-icon" aria-hidden>!</span>
           )}
           <span>{banner.text}</span>
-          <button
-            className="banner-dismiss"
-            onClick={() => setBanner(null)}
-            aria-label="Dismiss"
-          >×</button>
+          <button className="banner-dismiss" onClick={() => setBanner(null)} aria-label="Dismiss">×</button>
         </div>
       )}
+
+      {/* NEW: Bulk apply toolbar */}
+      <div className="bulk-toolbar">
+        <span className="muted">Apply to all:</span>
+        <button className="btn bulk yes" onClick={() => applyToAll('yes')}>Mark all Yes</button>
+        <button className="btn bulk maybe" onClick={() => applyToAll('maybe')}>Mark all Maybe</button>
+        <button className="btn bulk no" onClick={() => applyToAll('no')}>Mark all No</button>
+      </div>
 
       {loading && <p className="muted">Loading events…</p>}
       {error && <p className="error-text">{error}</p>}
@@ -243,9 +282,7 @@ const PerformerAvailability: React.FC = () => {
             </dl>
 
             <div className="availability-actions">
-              <label className="sr-only" htmlFor={`sel-${ev.id}`}>
-                Availability for {ev.title}
-              </label>
+              <label className="sr-only" htmlFor={`sel-${ev.id}`}>Availability for {ev.title}</label>
               <select
                 id={`sel-${ev.id}`}
                 value={availability[ev.id] || ''}
@@ -281,4 +318,3 @@ const PerformerAvailability: React.FC = () => {
 };
 
 export default PerformerAvailability;
-

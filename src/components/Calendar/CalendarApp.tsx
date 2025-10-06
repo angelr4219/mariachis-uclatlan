@@ -1,6 +1,6 @@
 // =============================================
-// FILE: src/components/Calendar/CalendarApp.tsx (UPDATED + FIXED)
-// Adds availability badges and optional live subscriptions; fixes JSX/ARIA issues
+// FILE: src/components/Calendar/CalendarApp.tsx (UPDATED)
+// Right-side drawer (like Reports) + availability badges + live subscriptions
 // =============================================
 import React from 'react';
 import './CalendarApp.css';
@@ -30,7 +30,7 @@ export interface CalendarAppProps {
   showViewToggle?: boolean;           // default true
 
   // Attendee drawer
-  canViewParticipants?: boolean;      // if true, clicking shows attendees
+  canViewParticipants?: boolean;      // if true, drawer shows attendees
   fetchParticipants?: (eventId: string) => Promise<ParticipantInfo[]>;
 
   // Live availability subscriptions (Firestore onSnapshot wrapper)
@@ -154,7 +154,7 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
   const [activeView, setActiveView] = React.useState<'month' | 'agenda'>(view);
 
   // Drawer state
-  const [openDrawer, setOpenDrawer] = React.useState(false);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [selectedEvent, setSelectedEvent] = React.useState<EventItem | null>(null);
   const [attendees, setAttendees] = React.useState<ParticipantInfo[] | null>(null);
   const [loadingAttendees, setLoadingAttendees] = React.useState(false);
@@ -163,14 +163,22 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
   const [avMap, setAvMap] = React.useState<Record<string, AvSummary>>({});
   const subsRef = React.useRef<Record<string, () => void>>({});
 
+  // Announce month externally
   React.useEffect(() => {
     onMonthChange?.(cursor.getFullYear(), cursor.getMonth());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor.getFullYear(), cursor.getMonth()]);
 
+  // Keep external view prop in sync
+  React.useEffect(() => { setActiveView(view); }, [view]);
+
+  // Keyboard: close on Escape
   React.useEffect(() => {
-    setActiveView(view);
-  }, [view]);
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
 
   const visibleEvents = React.useMemo(() => {
     return (filterByAudience ? events.filter(e => canViewerSee(e, viewerRole)) : events)
@@ -179,7 +187,6 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
 
   const cells = React.useMemo(() => buildGrid(cursor, firstDayOfWeek), [cursor, firstDayOfWeek]);
   const eventsByDate = React.useMemo(() => groupEventsByDay(visibleEvents, expandMultiDay), [visibleEvents, expandMultiDay]);
-
   const weekdayLabels = React.useMemo(() => rotate(WEEKDAYS, firstDayOfWeek), [firstDayOfWeek]);
 
   // Agenda grouping
@@ -238,17 +245,15 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
 
   const openEventDrawer = async (ev: EventItem) => {
     onEventClick?.(ev);
-    if (!canViewParticipants) return; // keep legacy behavior
-
+    // Always open drawer (like Reports). If attendees disabled, we still show event details.
     setSelectedEvent(ev);
-    setOpenDrawer(true);
+    setDrawerOpen(true);
 
-    if (fetchParticipants) {
+    if (canViewParticipants && fetchParticipants) {
       setLoadingAttendees(true);
       try {
         const list = await fetchParticipants(ev.id);
         setAttendees(list);
-        // also update the summary cache
         setAvMap((prev) => ({ ...prev, [ev.id]: summarize(list) }));
       } finally {
         setLoadingAttendees(false);
@@ -259,7 +264,7 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
   };
 
   const closeDrawer = () => {
-    setOpenDrawer(false);
+    setDrawerOpen(false);
     setSelectedEvent(null);
     setAttendees(null);
   };
@@ -380,36 +385,55 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
         </div>
       )}
 
-      {/* Attendee Drawer */}
-      {openDrawer && selectedEvent && (
-        <div className="drawer-backdrop" role="dialog" aria-modal="true" onClick={closeDrawer}>
-          <div className="drawer" onClick={(e) => e.stopPropagation()}>
+      {/* Right-side Drawer (Reports-style) */}
+      {drawerOpen && selectedEvent && (
+        <div className="cal-drawer-container" aria-hidden={!drawerOpen}>
+          <div className="cal-drawer-backdrop" onClick={closeDrawer} />
+
+          <div
+            className="cal-drawer-panel"
+            role="dialog"
+            aria-modal={true}
+            aria-label="Event details"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="drawer-head">
               <div>
                 <div className="drawer-title">{selectedEvent.title}</div>
                 <div className="drawer-meta">
-                  {selectedEvent.start.toLocaleString()} {selectedEvent.end ? `– ${selectedEvent.end.toLocaleTimeString()}` : ''}
+                  {selectedEvent.start.toLocaleString()}
+                  {selectedEvent.end ? ` – ${selectedEvent.end.toLocaleTimeString()}` : ''}
                   {(selectedEvent as any).location ? ` • ${(selectedEvent as any).location}` : ''}
                 </div>
               </div>
               <button className="drawer-close" onClick={closeDrawer} aria-label="Close">✕</button>
             </div>
 
-            {canViewParticipants ? (
-              <div className="drawer-body">
-                {loadingAttendees ? (
-                  <div className="loading">Loading attendees…</div>
-                ) : attendees && attendees.length ? (
-                  <AttendeeTabs list={attendees} />
+            <div className="drawer-body">
+              <div className="stack">
+                <div className="muted-text">
+                  {(selectedEvent as any).description ?? 'No description provided.'}
+                </div>
+
+                {/* Availability summary chips (always visible if known) */}
+                <div>
+                  <AvBadges id={selectedEvent.id} />
+                </div>
+
+                {/* Attendees (optional) */}
+                {canViewParticipants ? (
+                  loadingAttendees ? (
+                    <div className="loading">Loading attendees…</div>
+                  ) : attendees && attendees.length ? (
+                    <AttendeeTabs list={attendees} />
+                  ) : (
+                    <div className="muted-text">No attendee data.</div>
+                  )
                 ) : (
-                  <div className="muted-text">No attendee data.</div>
+                  <div className="muted-text">Attendee visibility disabled.</div>
                 )}
               </div>
-            ) : (
-              <div className="drawer-body">
-                <p className="muted-text">Attendee visibility disabled.</p>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
@@ -442,7 +466,7 @@ const AttendeeTabs: React.FC<{ list: ParticipantInfo[] }> = ({ list }) => {
 
   return (
     <div className="att-wrap">
-      <div className="att-tabs" role="tablist">
+      <div className="att-tabs" role="tablist" aria-label="Attendee filters">
         <button className={`att-tab ${tab==='going'?'active':''}`} onClick={() => setTab('going')} role="tab" aria-selected={tab==='going'}>
           Going ({buckets.g.length})
         </button>

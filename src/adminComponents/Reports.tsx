@@ -1,9 +1,10 @@
 // =============================================
 // FILE: src/pages/admin/Reports.tsx
-// Purpose: Admin reports page that fetches counts from Firestore for
-//          Events, Inquiries, and Availability over a date range.
-//          Adds finalize flow: approve performers and write payments.
-//          FIXES: availability mirror uses `eventStart` + supports status/response.
+// Purpose: Reports + Finalization UI (solid, reliable)
+// - Stat cards (stack on mobile)
+// - Events table with Manage action
+// - Mixed recent list (Events • Inquiries • Availability)
+// - Right-side drawer to approve YES RSVPs and write payments
 // =============================================
 import React from 'react';
 import {
@@ -13,15 +14,18 @@ import {
   getDocs,
   orderBy,
   Timestamp,
-
   doc,
   updateDoc,
   setDoc,
   serverTimestamp,
+  type DocumentData,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firebase'; // ← adjust if your firebase export lives elsewhere
+// If you don't have this helper, replace with a simple <div className="grid cols-3"> wrapper
+import { StackOnMobile } from '../components/StackOnMobile'; // ← adjust path if needed
 import './Reports.css';
 
+// ---------- Types ----------
 interface BaseDoc {
   id: string;
   date: Date | null;
@@ -32,15 +36,19 @@ interface BaseDoc {
   location?: string;
 }
 
-interface AvailabilityDoc extends BaseDoc {
-  response?: 'Yes' | 'No' | 'Maybe' | string;
-  eventId?: string;
+interface AvailabilityDoc {
+  id: string;
   uid?: string;
   name?: string;
+  eventId?: string;
+  date: Date | null;
+  response?: 'Yes' | 'No' | 'Maybe' | string;
+  title?: string;
 }
 
 type FinalizeRow = { uid: string; name: string; approved: boolean };
 
+// ---------- Helpers ----------
 const toDate = (value: any): Date | null => {
   try {
     if (!value && value !== 0) return null;
@@ -50,37 +58,43 @@ const toDate = (value: any): Date | null => {
   } catch {}
   return null;
 };
-const titleCase = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : undefined);
 const normalizeStatus = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : 'Unknown');
-
+const titleCase = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : undefined);
 const hoursBetween = (start?: any, end?: any): number => {
   const s = start ? toDate(start) : null;
   const e = end ? toDate(end) : null;
   if (!s || !e) return 0;
   const ms = Math.max(0, e.getTime() - s.getTime());
-  return Math.round((ms / 36e5) * 4) / 4;
+  return Math.round((ms / 36e5) * 4) / 4; // 0.25 hr steps
 };
 
+// ---------- Component ----------
 const Reports: React.FC = () => {
+  // Filters
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
+
+  // Loading & errors
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
 
+  // Data buckets
   const [eventDocs, setEventDocs] = React.useState<BaseDoc[]>([]);
   const [inquiryDocs, setInquiryDocs] = React.useState<BaseDoc[]>([]);
   const [availabilityDocs, setAvailabilityDocs] = React.useState<AvailabilityDoc[]>([]);
 
+  // Tallies
   const [eventStats, setEventStats] = React.useState({ total: 0, published: 0, canceled: 0, completed: 0 });
   const [inquiryStats, setInquiryStats] = React.useState({ Submitted: 0, Accepted: 0, Booked: 0, Completed: 0 } as Record<string, number>);
   const [availabilityStats, setAvailabilityStats] = React.useState({ total: 0, Yes: 0, Maybe: 0, No: 0 });
-  const [financeHours, setFinanceHours] = React.useState(0);
 
+  // Drawer (finalization)
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [selectedEvent, setSelectedEvent] = React.useState<BaseDoc | null>(null);
   const [finalizeRows, setFinalizeRows] = React.useState<FinalizeRow[]>([]);
   const [finalizing, setFinalizing] = React.useState(false);
 
+  // Fetch all tallies + lists
   const fetchCounts = React.useCallback(async () => {
     setLoading(true);
     setError('');
@@ -89,11 +103,16 @@ const Reports: React.FC = () => {
     const end = endDate ? new Date(endDate + 'T23:59:59.999') : null;
 
     try {
-      // Events
+      // ----- Events -----
       const eventsColl = collection(db, 'events');
       let eventsQuery;
       if (start && end) {
-        eventsQuery = query(eventsColl, where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)), orderBy('date', 'desc'));
+        eventsQuery = query(
+          eventsColl,
+          where('date', '>=', Timestamp.fromDate(start)),
+          where('date', '<=', Timestamp.fromDate(end)),
+          orderBy('date', 'desc')
+        );
       } else if (start) {
         eventsQuery = query(eventsColl, where('date', '>=', Timestamp.fromDate(start)), orderBy('date', 'desc'));
       } else if (end) {
@@ -122,11 +141,16 @@ const Reports: React.FC = () => {
         else if (s === 'completed' || s === 'done') eStats.completed++;
       }
 
-      // Inquiries
+      // ----- Inquiries -----
       const inquiriesColl = collection(db, 'inquiries');
       let inqQuery;
       if (start && end) {
-        inqQuery = query(inquiriesColl, where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)), orderBy('date', 'desc'));
+        inqQuery = query(
+          inquiriesColl,
+          where('date', '>=', Timestamp.fromDate(start)),
+          where('date', '<=', Timestamp.fromDate(end)),
+          orderBy('date', 'desc')
+        );
       } else if (start) {
         inqQuery = query(inquiriesColl, where('date', '>=', Timestamp.fromDate(start)), orderBy('date', 'desc'));
       } else if (end) {
@@ -145,16 +169,21 @@ const Reports: React.FC = () => {
         };
       });
       const iStats = { Submitted: 0, Accepted: 0, Booked: 0, Completed: 0 } as Record<string, number>;
-      for (const q of inquiries) {
-        const s = normalizeStatus(q.status);
+      for (const qd of inquiries) {
+        const s = normalizeStatus(qd.status);
         if (s in iStats) (iStats as any)[s]++;
       }
 
-      // Availability (flat mirror) — use eventStart not date
+      // ----- Availability (flat) -----
       const availColl = collection(db, 'availability');
       let availQuery;
       if (start && end) {
-        availQuery = query(availColl, where('eventStart', '>=', Timestamp.fromDate(start)), where('eventStart', '<=', Timestamp.fromDate(end)), orderBy('eventStart', 'desc'));
+        availQuery = query(
+          availColl,
+          where('eventStart', '>=', Timestamp.fromDate(start)),
+          where('eventStart', '<=', Timestamp.fromDate(end)),
+          orderBy('eventStart', 'desc')
+        );
       } else if (start) {
         availQuery = query(availColl, where('eventStart', '>=', Timestamp.fromDate(start)), orderBy('eventStart', 'desc'));
       } else if (end) {
@@ -172,10 +201,10 @@ const Reports: React.FC = () => {
           id: d.id,
           uid: (data as any).uid,
           name: (data as any).displayName || (data as any).name,
+          eventId: (data as any).eventId,
           date: toDate((data as any).eventStart ?? (data as any).date),
           response,
-          eventId: (data as any).eventId,
-          title: (data as any).title || (data as any).eventTitle,
+          title: (data as any).eventTitle || (data as any).title,
         };
       });
       const aStats = { total: availability.length, Yes: 0, Maybe: 0, No: 0 };
@@ -185,16 +214,13 @@ const Reports: React.FC = () => {
         else if (r.response === 'No') aStats.No++;
       }
 
-      let finHours = 0;
-      for (const e of events) if ((e.status || '').toLowerCase() === 'completed') finHours += hoursBetween(e.start, e.end);
-
+      // Apply to state
       setEventDocs(events);
       setInquiryDocs(inquiries);
       setAvailabilityDocs(availability);
       setEventStats(eStats);
       setInquiryStats(iStats as any);
       setAvailabilityStats(aStats);
-      setFinanceHours(finHours);
     } catch (err: any) {
       console.error(err);
       setError(err?.message ?? 'Failed to fetch report data');
@@ -204,58 +230,33 @@ const Reports: React.FC = () => {
       setEventStats({ total: 0, published: 0, canceled: 0, completed: 0 });
       setInquiryStats({ Submitted: 0, Accepted: 0, Booked: 0, Completed: 0 });
       setAvailabilityStats({ total: 0, Yes: 0, Maybe: 0, No: 0 });
-      setFinanceHours(0);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }, [startDate, endDate]);
 
   React.useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
-  const handleExportCSV = () => {
-    try {
-      const header = '\uFEFF';
-      const lines = [
-        'Metric,Value',
-        `Events Total,${eventStats.total}`,
-        `Events Published,${eventStats.published}`,
-        `Events Canceled,${eventStats.canceled}`,
-        `Events Completed,${eventStats.completed}`,
-        `Inquiries Submitted,${inquiryStats.Submitted}`,
-        `Inquiries Accepted,${inquiryStats.Accepted}`,
-        `Inquiries Booked,${inquiryStats.Booked}`,
-        `Inquiries Completed,${inquiryStats.Completed}`,
-        `Availability Total,${availabilityStats.total}`,
-        `Availability Yes,${availabilityStats.Yes}`,
-        `Availability Maybe,${availabilityStats.Maybe}`,
-        `Availability No,${availabilityStats.No}`,
-        `Finance Approved Hours (approx),${financeHours}`,
-      ];
-      const csv = header + lines.join('\r\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'tallies.csv';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) { console.error('CSV export failed:', e); }
-  };
-
+  // ---------- Drawer actions ----------
   const openFinalize = async (ev: BaseDoc) => {
     setSelectedEvent(ev);
     setDrawerOpen(true);
-    const baseQ = query(collection(db, 'availability'), where('eventId', '==', ev.id));
-    const snap = await getDocs(baseQ);
-    const rows: FinalizeRow[] = snap.docs
-      .map((d) => d.data() as any)
-      .filter((data) => {
-        const raw = data.status ?? data.response;
-        const s = typeof raw === 'string' ? raw.toLowerCase() : '';
-        return s === 'yes' || s === 'going' || s === 'attending';
-      })
-      .map((data) => ({ uid: data.uid, name: data.displayName || data.name || data.email || data.uid, approved: false }));
-    setFinalizeRows(rows);
+    try {
+      const qRef = query(collection(db, 'availability'), where('eventId', '==', ev.id));
+      const snap = await getDocs(qRef);
+      const rows: FinalizeRow[] = snap.docs
+        .map((d) => d.data() as any)
+        .filter((x) => ['yes', 'going', 'attending'].includes(String(x.status ?? x.response).toLowerCase()))
+        .map((x) => ({ uid: x.uid, name: x.displayName || x.name || x.email || x.uid, approved: false }));
+      setFinalizeRows(rows);
+    } catch (e) {
+      console.error(e);
+      setFinalizeRows([]);
+    }
   };
 
-  const toggleApprove = (uid: string) => setFinalizeRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, approved: !r.approved } : r)));
+  const toggleApprove = (uid: string) =>
+    setFinalizeRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, approved: !r.approved } : r)));
 
   const finalizeEvent = async () => {
     if (!selectedEvent) return;
@@ -280,38 +281,52 @@ const Reports: React.FC = () => {
         })
       );
 
-      await updateDoc(doc(db, 'events', selectedEvent.id), { status: 'completed', completedAt: serverTimestamp() } as any);
+      await updateDoc(doc(db, 'events', selectedEvent.id), {
+        status: 'completed',
+        completedAt: serverTimestamp(),
+      } as any);
       await fetchCounts();
-      setDrawerOpen(false); setSelectedEvent(null); setFinalizeRows([]);
-    } catch (e) { console.error('Finalize failed', e); setError('Finalize failed. See console.'); }
-    finally { setFinalizing(false); }
+      setDrawerOpen(false);
+      setSelectedEvent(null);
+      setFinalizeRows([]);
+    } catch (e) {
+      console.error('Finalize failed', e);
+      setError('Finalize failed. See console.');
+    } finally {
+      setFinalizing(false);
+    }
   };
 
+  // ---------- UI ----------
   return (
     <section className="reports stack">
       <header className="stack">
         <h1 className="title">Reports</h1>
-        <p className="lede">Tallies for Events, Inquiries, Availability — with event finalization.</p>
+        <p className="lede">Tallies for Events, Inquiries, and Availability with simple finalization.</p>
       </header>
 
       <div className="toolbar">
         <div className="left">
-          <label className="field"><span>From</span>
+          <label className="field">
+            <span>From</span>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </label>
-          <label className="field"><span>To</span>
+          <label className="field">
+            <span>To</span>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </label>
         </div>
         <div className="right">
-          <button className="btn" onClick={handleExportCSV} disabled={loading}>Export CSV</button>
-          <button className="btn btn-secondary" onClick={fetchCounts} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
+          <button className="btn" onClick={fetchCounts} disabled={loading}>
+            {loading ? 'Loading…' : 'Refresh'}
+          </button>
         </div>
       </div>
 
       {error && <div className="alert">{error}</div>}
 
-      <div className="grid cols-3 stack-md">
+      {/* Stat cards stack on mobile */}
+      <StackOnMobile className="grid cols-3 stack-md">
         <article className="card stat">
           <h3>Events</h3>
           <p className="muted">Total (range): {eventStats.total}</p>
@@ -336,11 +351,12 @@ const Reports: React.FC = () => {
           <div className="pill-row"><span className="badge maybe">Maybe</span><strong>{availabilityStats.Maybe}</strong></div>
           <div className="pill-row"><span className="badge no">No</span><strong>{availabilityStats.No}</strong></div>
         </article>
-      </div>
+      </StackOnMobile>
 
+      {/* Events table with Manage action */}
       <section className="card stack">
         <h3>Events in Range</h3>
-        <div className="table">
+        <div className="table table-5">
           <div className="row head">
             <div>Date</div><div>Title</div><div>Status</div><div>Duration</div><div>Actions</div>
           </div>
@@ -358,6 +374,7 @@ const Reports: React.FC = () => {
         </div>
       </section>
 
+      {/* Mixed recent list */}
       <section className="card stack">
         <h3>Recent (Events • Inquiries • Availability)</h3>
         <div className="table">
@@ -397,16 +414,25 @@ const Reports: React.FC = () => {
         </div>
       </section>
 
-      {drawerOpen && selectedEvent && (
-        <div className="drawer-backdrop" role="dialog" aria-modal onClick={() => setDrawerOpen(false)}>
-          <div className="drawer" onClick={(e) => e.stopPropagation()}>
+      {/* Drawer container + backdrop + right-side panel */}
+      {drawerOpen && (
+        <div className="rep-drawer-container" aria-hidden={!drawerOpen}>
+          <div className="rep-drawer-backdrop" onClick={() => setDrawerOpen(false)} />
+
+          <div
+            className="rep-drawer-panel"
+            role="dialog"
+            aria-modal={true}
+            aria-label="Finalize Event"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="drawer-head">
               <div>
-                <div className="drawer-title">Finalize: {selectedEvent.title}</div>
+                <div className="drawer-title">Finalize: {selectedEvent?.title ?? '—'}</div>
                 <div className="drawer-meta">
-                  {toDate(selectedEvent.start)?.toLocaleString() ?? '—'}
-                  {selectedEvent.end ? ` – ${toDate(selectedEvent.end)?.toLocaleTimeString()}` : ''}
-                  {selectedEvent.location ? ` • ${selectedEvent.location}` : ''}
+                  {selectedEvent?.start ? toDate(selectedEvent.start)?.toLocaleString() : '—'}
+                  {selectedEvent?.end ? ` – ${toDate(selectedEvent.end)?.toLocaleTimeString()}` : ''}
+                  {selectedEvent?.location ? ` • ${selectedEvent.location}` : ''}
                 </div>
               </div>
               <button className="drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Close">✕</button>
@@ -416,7 +442,9 @@ const Reports: React.FC = () => {
               <p className="muted">YES RSVPs — check whom to approve for payment.</p>
               <div className="table">
                 <div className="row head"><div>Approve</div><div>Performer</div></div>
-                {finalizeRows.length === 0 && (<div className="row message"><div className="full">No YES RSVPs found.</div></div>)}
+                {finalizeRows.length === 0 && (
+                  <div className="row message"><div className="full">No YES RSVPs found.</div></div>
+                )}
                 {finalizeRows.map((r) => (
                   <div key={r.uid} className="row">
                     <div><input type="checkbox" checked={r.approved} onChange={() => toggleApprove(r.uid)} aria-label={`Approve ${r.name}`} /></div>
@@ -425,8 +453,8 @@ const Reports: React.FC = () => {
                 ))}
               </div>
               <div className="stack">
-                <div className="muted">Duration: {hoursBetween(selectedEvent.start, selectedEvent.end)} hr</div>
-                <button className="btn-primary" onClick={finalizeEvent} disabled={finalizing || finalizeRows.every(r => !r.approved)}>
+                <div className="muted">Duration: {selectedEvent ? hoursBetween(selectedEvent.start, selectedEvent.end) : 0} hr</div>
+                <button className="btn-primary" onClick={finalizeEvent} disabled={finalizing || finalizeRows.every((r) => !r.approved)}>
                   {finalizing ? 'Finalizing…' : 'Finalize & Write Payments'}
                 </button>
               </div>

@@ -1,31 +1,31 @@
+/* =============================================
+   FILE: src/pages/MembersOnly.css (ADDITIONS)
+   ============================================= */
+/* Layout helpers already in your file — below are small additions for the new UI */
 
-/* FILE: src/pages/MembersOnly.css */
-.members-dashboard { max-width: 1100px; margin: 0 auto; }
-.welcome { margin-bottom: 1rem; }
+.nice-list { margin: .5rem 0 0; padding-left: 1.2rem; }
+.nice-list li { margin: .2rem 0; }
+.small { font-size: .9rem; }
 
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 1rem; }
+.funny-picture { display:flex; flex-direction:column; gap:.5rem; }
+.funny-figure { margin:0; border:1px dashed #e5e7eb; border-radius:8px; overflow:hidden; text-align:center; }
+.funny-image { width:100%; height:auto; display:block; }
+.funny-image.hover { filter:brightness(.95); }
+.funny-controls { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+.btn-outline { border:1px solid #e5e7eb; background:#fff; border-radius:8px; padding:.4rem .7rem; cursor:pointer; }
+.url-input { display:flex; gap:.4rem; flex:1; }
+.url-input input { flex:1; border:1px solid #e5e7eb; border-radius:8px; padding:.4rem .6rem; }
+.btn { border:1px solid #e5e7eb; background:#111827; color:#fff; border-radius:8px; padding:.4rem .7rem; cursor:pointer; }
+.btn.ghost { background:#fff; color:#111827; }
 
-.quick-links ul { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: .5rem; }
-.quick-links a { color: #2774AE; font-weight: 600; text-decoration: none; }
-.quick-links a:hover { text-decoration: underline; }
+.halloween .poll { display:flex; gap:.4rem; margin:.5rem 0; }
+.option-btn { border:1px solid #e5e7eb; background:#fff; border-radius:9999px; padding:.35rem .75rem; cursor:pointer; text-transform:capitalize; }
+.option-btn.selected { background:#2563eb; color:#fff; border-color:#2563eb; }
 
-.funny-picture .dropzone { position: relative; border: 2px dashed #cbd5e1; border-radius: 12px; padding: .75rem; text-align: center; }
-.funny-picture .dropzone.hover { background: #f8fafc; }
-.funny-image { max-width: 100%; max-height: 320px; border-radius: 10px; display: block; margin: 0 auto .75rem; }
-.controls { display: flex; gap: .5rem; justify-content: center; margin-bottom: .5rem; }
-.btn { background: #2774AE; color: #fff; border: none; border-radius: 10px; padding: .5rem .9rem; cursor: pointer; font-weight: 600; }
-.btn:hover { opacity: .95; }
-.btn.outline { background: transparent; color: #2774AE; border: 2px solid #2774AE; }
-.url-row { display: grid; grid-template-columns: 1fr auto; gap: .5rem; align-items: center; }
-.url-row input { width: 100%; padding: .5rem .6rem; border: 1px solid #cbd5e1; border-radius: 8px; }
-.hint { color: #64748b; font-size: .9rem; margin-top: .35rem; }
+.pledge { margin-top:.5rem; }
+.pledge-row { display:flex; align-items:center; gap:.35rem; margin-top:.25rem; }
+.prefix { padding:.35rem .45rem; border:1px solid #e5e7eb; border-radius:8px; background:#f9fafb; }
+.pledge-input { width:100px; border:1px solid #e5e7eb; border-radius:8px; padding:.4rem .6rem; }
+.note { margin-top:.35rem; }
 
-.news .bullets { margin: .25rem 0 0; }
-.news .bullets li { margin: .4rem 0; }
-
-/* Responsive */
-@media (max-width: 900px) {
-  .grid { grid-template-columns: 1fr; }
-}
-
+.you-said { margin-top:.6rem; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:8px; padding:.5rem; }

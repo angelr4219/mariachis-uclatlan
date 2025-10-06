@@ -1,5 +1,4 @@
-
-// FILE: src/pages/MembersOnly.tsx
+// FILE: src/pages/MembersOnly.tsx (UPDATED)
 import React from 'react';
 import './MembersOnly.css';
 import { Link } from 'react-router-dom';
@@ -37,10 +36,24 @@ const useFunnyPicture = () => {
   return { src: src ?? DEFAULT_FUNNY_SVG, update };
 };
 
+// Small local-storage backed interest/pledge state
+type HalloweenState = { interest: 'yes'|'maybe'|'no'|null; pledge: string };
+const useHalloweenState = () => {
+  const [state, setState] = React.useState<HalloweenState>(() => {
+    try { return JSON.parse(localStorage.getItem('members:halloweenInterest') || 'null') ?? { interest: null, pledge: '' }; }
+    catch { return { interest: null, pledge: '' }; }
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem('members:halloweenInterest', JSON.stringify(state)); } catch {}
+  }, [state]);
+  return { state, setState };
+};
+
 const MembersOnly: React.FC = () => {
   const { src, update } = useFunnyPicture();
   const [url, setUrl] = React.useState('');
   const [hover, setHover] = React.useState(false);
+  const { state, setState } = useHalloweenState();
 
   const onFile = (file: File) => {
     const reader = new FileReader();
@@ -78,29 +91,40 @@ const MembersOnly: React.FC = () => {
       </header>
 
       <div className="grid">
-      <article className="card announcement">
+        {/* Week 2 Announcement */}
+        <article className="card announcement">
           <h2>Hi — welcome back to Week 2!</h2>
-          <p>
-          This week in Uclatlán, we kick things off with <strong>rehearsal on Monday, Oct 6 at 7:00 PM</strong>.
-          </p>
-          <p>
-          We typically have a <strong>mariachi dinner at 6:00 PM</strong> — <em>location TBA</em>. Keep an eye on the Events page for updates.
-          </p>
+          <ul className="nice-list">
+            <li><strong>Rehearsal</strong> is at <strong>7:00 PM</strong>.</li>
+            <li><strong>Dinner</strong> is at <strong>6:00 PM</strong> (location TBA).</li>
+            <li>Keep an eye on <strong>GroupMe</strong> for last‑minute updates & location pin.</li>
+            <li>Angel - Should we make an Instagram groupchat over groupme gruopchat, if you think so please bug enrique abuot it.</li>
+            <li>Keep an eye on <strong>GroupMe</strong> for last‑minute updates & location pin.</li>
+          </ul>
+
         </article>
 
+        {/* Funny picture — now uses your saved image with optional upload/URL */}
         <article className="card funny-picture">
-<figure className="funny-figure">
-{/* Hard-coded image — replace the URL below */}
-<img
-src="https://images.unsplash.com/photo-1543852786-1cf6624b9987?q=80&w=1600&auto=format&fit=crop"
-alt="Mariachi vibes: a playful moment"
-className="funny-image"
-/>
-<figcaption className="caption">Mood check ✅ — add your own jokes below in the chat 😄</figcaption>
-</figure>
-</article>
+          <figure className="funny-figure" onDragOver={(e) => { e.preventDefault(); setHover(true); }} onDragLeave={() => setHover(false)} onDrop={onDrop}>
+            <img src={src} alt="Member-submitted funny image" className={`funny-image ${hover ? 'hover' : ''}`} />
+            <figcaption className="caption">Drop a file here or use the controls below ⤵️</figcaption>
+          </figure>
+          <div className="funny-controls">
+            <label className="btn-outline">
+              <input type="file" accept="image/*" onChange={onSelectFile} style={{ display: 'none' }} />
+              Upload Image
+            </label>
+            <div className="url-input">
+              <input type="url" placeholder="Paste image URL" value={url} onChange={(e) => setUrl(e.target.value)} />
+              <button className="btn" onClick={applyUrl}>Use URL</button>
+              <button className="btn ghost" onClick={clearPic}>Clear</button>
+            </div>
+          </div>
+        </article>
       </div>
 
+      {/* What’s new */}
       <article className="card news">
         <h2>What’s new</h2>
         <ul className="bullets">
@@ -109,8 +133,49 @@ className="funny-image"
           <li>🧑‍🎓 Welcome new members—check Resources for onboarding!</li>
         </ul>
       </article>
+
+      {/* Halloween Social interest + pledge */}
+      <article className="card halloween">
+        <h2>Halloween Social 🎃 — Interested?</h2>
+        <p>We’re thinking about a low‑key Halloween social. Would you come, and would you be willing to pitch in a few dollars for snacks/decor?</p>
+
+        <div className="poll" role="group" aria-label="Halloween social interest">
+          {(['yes','maybe','no'] as const).map(opt => (
+            <button
+              key={opt}
+              className={`option-btn ${state.interest === opt ? 'selected' : ''}`}
+              onClick={() => setState({ ...state, interest: opt })}
+            >{opt === 'yes' ? 'Yes' : opt === 'maybe' ? 'Maybe' : 'No'}</button>
+          ))}
+        </div>
+
+        <div className="pledge">
+          <label htmlFor="pledge" className="pledge-label">If yes/maybe: would you pitch in? <span className="muted">(suggested $5–$10)</span></label>
+          <div className="pledge-row">
+            <span className="prefix">$</span>
+            <input
+              id="pledge"
+              inputMode="decimal"
+              pattern="^[0-9]*[.,]?[0-9]*$"
+              className="pledge-input"
+              placeholder="0"
+              value={state.pledge}
+              onChange={(e) => setState({ ...state, pledge: e.target.value.replace(/[^0-9.,]/g,'') })}
+            />
+            <button className="btn" onClick={() => alert('Saved locally — thanks!')}>Save</button>
+          </div>
+          <p className="note muted small">Your response is stored locally in your browser for now. We’ll share a formal RSVP if we proceed.</p>
+        </div>
+
+        {state.interest && (
+          <div className="you-said">
+            <strong>Your current response:</strong> {state.interest.toUpperCase()} {state.pledge ? `• Pledge: $${state.pledge}` : ''}
+          </div>
+        )}
+      </article>
     </section>
   );
 };
 
 export default MembersOnly;
+
