@@ -134,6 +134,23 @@ service cloud.firestore {
       // Reads: admins can read everything; performers can read only their own docs
       allow get: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
       allow list: if isAdmin(); // listing/filtering for reports; performers shouldn't list others
+     
+     // Allow anyone signed in to upsert their response doc only
+    match /social_polls/halloween2025/responses/{uid} {
+      allow read: if request.auth != null;  // or restrict if you like
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Markers: same rule
+    match /social_polls/halloween2025/markers/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Aggregates: read for members, write never (only via Cloud Functions or client-side increments already happen on parent via updateDoc in our code)
+    match /social_polls/halloween2025 {
+      allow read: if request.auth != null;
+      allow write: if false; // block direct edits from clients if you prefer
     }
   }
 }
