@@ -1,467 +1,371 @@
-// =============================================
-// FILE: src/pages/admin/Reports.tsx
-// Purpose: Reports + Finalization UI (solid, reliable)
-// - Stat cards (stack on mobile)
-// - Events table with Manage action
-// - Mixed recent list (Events • Inquiries • Availability)
-// - Right-side drawer to approve YES RSVPs and write payments
-// =============================================
+// =============================================================
+// FILE: src/pages/admin/Report.tsx
+// Purpose: Build XLSX reports straight from flat `availability` docs
+// Reports:
+//  1) Performance Book — all events and participants
+//  2) Biweekly Timesheet Reference — grouped by 14-day pay periods
+//  3) **On-screen Preview** — per-pay-period table of finalized attendees + per-performer totals
+// Notes:
+//  - Avoids composite indexes: query on a single field per request, then filter/sort in memory.
+//  - Reads from `availability` (status == 'yes' filter done in memory when a date range is used).
+//  - Enriches rows with event meta from `events/{eventId}`.
+//  - Comp time = hours between start & end (prefer availability.eventStart/End; fallback to event doc).
+//  - Date range filter applies to eventStart.
+// =============================================================
 import React from 'react';
+import * as XLSX from 'xlsx';
 import {
   collection,
   query,
   where,
   getDocs,
-  orderBy,
-  Timestamp,
+  getDoc,
   doc,
-  updateDoc,
-  setDoc,
-  serverTimestamp,
+  Timestamp,
   type DocumentData,
 } from 'firebase/firestore';
-import { db } from '../firebase'; // ← adjust if your firebase export lives elsewhere
-// If you don't have this helper, replace with a simple <div className="grid cols-3"> wrapper
-import { StackOnMobile } from '../components/StackOnMobile'; // ← adjust path if needed
+import { db } from '../firebase';
 import './Reports.css';
 
-// ---------- Types ----------
-interface BaseDoc {
-  id: string;
-  date: Date | null;
-  status?: string;
-  title?: string;
-  start?: Timestamp | Date | string | null;
-  end?: Timestamp | Date | string | null;
-  location?: string;
-}
-
-interface AvailabilityDoc {
-  id: string;
-  uid?: string;
-  name?: string;
-  eventId?: string;
-  date: Date | null;
-  response?: 'Yes' | 'No' | 'Maybe' | string;
-  title?: string;
-}
-
-type FinalizeRow = { uid: string; name: string; approved: boolean };
-
-// ---------- Helpers ----------
-const toDate = (value: any): Date | null => {
-  try {
-    if (!value && value !== 0) return null;
-    if (value && typeof value === 'object' && 'toDate' in value) return (value as Timestamp).toDate();
-    if (typeof value === 'string') return new Date(value);
-    if (typeof value === 'number') return new Date(value);
-  } catch {}
-  return null;
-};
-const normalizeStatus = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : 'Unknown');
-const titleCase = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : undefined);
-const hoursBetween = (start?: any, end?: any): number => {
-  const s = start ? toDate(start) : null;
-  const e = end ? toDate(end) : null;
-  if (!s || !e) return 0;
-  const ms = Math.max(0, e.getTime() - s.getTime());
-  return Math.round((ms / 36e5) * 4) / 4; // 0.25 hr steps
+// ---------- helpers ----------
+const toDate = (v: any): Date | null => {
+  if (!v && v !== 0) return null;
+  if (v instanceof Date) return v;
+  if (v && typeof v === 'object' && 'toDate' in v) return (v as Timestamp).toDate();
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
 };
 
-// ---------- Component ----------
+const fmtISO = (d: Date | null): string =>
+  d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
+
+const hrs = (start: Date | null, end: Date | null): number | '' => {
+  if (!start || !end) return '';
+  const val = (end.getTime() - start.getTime()) / 36e5;
+  return Math.round(Math.max(0, val) * 100) / 100; // 2 decimals
+};
+
+const payKey = (d: Date, anchor: Date) => {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const a = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+  const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const idx = Math.floor((dd.getTime() - a.getTime()) / dayMs / 14);
+  const start = new Date(a.getTime() + idx * 14 * dayMs);
+  const end = new Date(start.getTime() + 13 * dayMs);
+  return `${fmtISO(start)} to ${fmtISO(end)}`;
+};
+
+// shape we export / preview
+export type Row = {
+  dateISO: string;
+  performer: string;
+  client: string;
+  eventName: string;
+  comp: number | '';
+};
+
+// ---------- Firestore loaders (no composite indexes) ----------
+/**
+ * Load availability rows while avoiding composite indexes:
+ * - If a date range is provided, query ONLY by eventStart range, then filter status/finalized in memory.
+ * - If no date range, query by status == 'yes' (single-field), then filter finalized in memory.
+ */
+const loadYesAvailability = async (opts: {
+  onlyFinalized: boolean;
+  from?: Date | null;
+  to?: Date | null;
+}): Promise<any[]> => {
+  const col = collection(db, 'availability');
+
+  // Case 1: Date range provided => query on eventStart only
+  if (opts.from || opts.to) {
+    const clauses: any[] = [];
+    if (opts.from) clauses.push(where('eventStart', '>=', Timestamp.fromDate(opts.from)));
+    if (opts.to) clauses.push(where('eventStart', '<=', Timestamp.fromDate(opts.to)));
+    const qRef = clauses.length ? query(col, ...clauses) : col;
+    const snap = await getDocs(qRef);
+    // Filter in memory to avoid composite index requirements
+    const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as { status?: string; finalized?: boolean }) }));
+    return all.filter((r) => {
+      const statusOK = (r.status || '') === 'yes';
+      const finOK = !opts.onlyFinalized || !!r.finalized;
+      return statusOK && finOK;
+    });
+  }
+
+  // Case 2: No date range => single-field query on status
+  const qRef = query(col, where('status', '==', 'yes'));
+  const snap = await getDocs(qRef);
+  const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as DocumentData) }));
+  return all.filter((r) => (!opts.onlyFinalized || !!(r as { finalized?: boolean }).finalized));
+};
+
+const buildEventMeta = async (ids: string[]) => {
+  const out = new Map<string, any>();
+  await Promise.all(
+    Array.from(new Set(ids)).map(async (id) => {
+      try {
+        const ds = await getDoc(doc(db, 'events', id));
+        out.set(id, ds.exists() ? ds.data() : {});
+      } catch {
+        out.set(id, {});
+      }
+    })
+  );
+  return out;
+};
+
+const rowsFromAvailability = async (list: any[]): Promise<Row[]> => {
+  const eventIds = list.map((a) => a.eventId).filter(Boolean) as string[];
+  const meta = await buildEventMeta(eventIds);
+
+  const rows: Row[] = list.map((a) => {
+    const m = meta.get(a.eventId) || {};
+    const start = toDate(a.eventStart) || toDate((m as any).start) || toDate((m as any).date);
+    const end = toDate(a.eventEnd) || toDate((m as any).end) || null;
+    const client = (m as any).client || (m as any).dept || '';
+    const eventName = a.eventTitle || (m as any).title || '';
+    return {
+      dateISO: fmtISO(start),
+      performer: a.displayName || a.name || a.email || 'Unknown',
+      client,
+      eventName,
+      comp: hrs(start, end),
+    };
+  });
+
+  // Sort on client (stable) to keep Firestore query simple
+  rows.sort(
+    (a, b) =>
+      String(a.dateISO).localeCompare(String(b.dateISO)) ||
+      String(a.eventName).localeCompare(String(b.eventName)) ||
+      String(a.performer).localeCompare(String(b.performer))
+  );
+
+  return rows;
+};
+
+// ---------- grouping for preview ----------
+const buildBiweeklyPreview = (rows: Row[], anchorISO: string) => {
+  const anchor = new Date(anchorISO + 'T00:00:00');
+  type PeriodData = { rows: Row[]; totals: Record<string, number>; totalHours: number };
+  const map = new Map<string, PeriodData>();
+
+  for (const r of rows) {
+    const d = r.dateISO ? new Date(r.dateISO + 'T00:00:00') : null;
+    const key = d ? payKey(d, anchor) : 'Unknown Period';
+    if (!map.has(key)) map.set(key, { rows: [], totals: {}, totalHours: 0 });
+    const bucket = map.get(key)!;
+    bucket.rows.push(r);
+    const hours = typeof r.comp === 'number' ? r.comp : 0;
+    bucket.totalHours += hours;
+    bucket.totals[r.performer] = (bucket.totals[r.performer] || 0) + hours;
+  }
+
+  // sort rows within period by date → event → performer
+  for (const b of map.values()) {
+    b.rows.sort(
+      (a, b) =>
+        String(a.dateISO).localeCompare(String(b.dateISO)) ||
+        String(a.eventName).localeCompare(String(b.eventName)) ||
+        String(a.performer).localeCompare(String(b.performer))
+    );
+  }
+
+  return map;
+};
+
+// ---------- component ----------
 const Reports: React.FC = () => {
-  // Filters
-  const [startDate, setStartDate] = React.useState('');
-  const [endDate, setEndDate] = React.useState('');
+  const [onlyFinalized, setOnlyFinalized] = React.useState(true);
+  const [from, setFrom] = React.useState<string>('');
+  const [to, setTo] = React.useState<string>('');
+  const [anchor, setAnchor] = React.useState<string>('2025-06-23');
+  const [busy, setBusy] = React.useState<'none' | 'perf' | 'biweekly' | 'preview'>('none');
+  const [error, setError] = React.useState<string>('');
+  const [preview, setPreview] = React.useState<Map<string, { rows: Row[]; totals: Record<string, number>; totalHours: number }>>(new Map());
 
-  // Loading & errors
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState('');
+  const parseDate = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
 
-  // Data buckets
-  const [eventDocs, setEventDocs] = React.useState<BaseDoc[]>([]);
-  const [inquiryDocs, setInquiryDocs] = React.useState<BaseDoc[]>([]);
-  const [availabilityDocs, setAvailabilityDocs] = React.useState<AvailabilityDoc[]>([]);
-
-  // Tallies
-  const [eventStats, setEventStats] = React.useState({ total: 0, published: 0, canceled: 0, completed: 0 });
-  const [inquiryStats, setInquiryStats] = React.useState({ Submitted: 0, Accepted: 0, Booked: 0, Completed: 0 } as Record<string, number>);
-  const [availabilityStats, setAvailabilityStats] = React.useState({ total: 0, Yes: 0, Maybe: 0, No: 0 });
-
-  // Drawer (finalization)
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [selectedEvent, setSelectedEvent] = React.useState<BaseDoc | null>(null);
-  const [finalizeRows, setFinalizeRows] = React.useState<FinalizeRow[]>([]);
-  const [finalizing, setFinalizing] = React.useState(false);
-
-  // Fetch all tallies + lists
-  const fetchCounts = React.useCallback(async () => {
-    setLoading(true);
+  const rebuildPreview = async () => {
+    setBusy('preview');
     setError('');
-
-    const start = startDate ? new Date(startDate + 'T00:00:00') : null;
-    const end = endDate ? new Date(endDate + 'T23:59:59.999') : null;
-
     try {
-      // ----- Events -----
-      const eventsColl = collection(db, 'events');
-      let eventsQuery;
-      if (start && end) {
-        eventsQuery = query(
-          eventsColl,
-          where('date', '>=', Timestamp.fromDate(start)),
-          where('date', '<=', Timestamp.fromDate(end)),
-          orderBy('date', 'desc')
-        );
-      } else if (start) {
-        eventsQuery = query(eventsColl, where('date', '>=', Timestamp.fromDate(start)), orderBy('date', 'desc'));
-      } else if (end) {
-        eventsQuery = query(eventsColl, where('date', '<=', Timestamp.fromDate(end)), orderBy('date', 'desc'));
-      } else {
-        eventsQuery = query(eventsColl, orderBy('date', 'desc'));
-      }
-      const eventsSnap = await getDocs(eventsQuery);
-      const events: BaseDoc[] = eventsSnap.docs.map((d) => {
-        const data = d.data() as DocumentData;
-        return {
-          id: d.id,
-          date: toDate((data as any).date ?? (data as any).start),
-          start: (data as any).start ?? (data as any).date,
-          end: (data as any).end ?? null,
-          status: (data as any).status ? normalizeStatus((data as any).status) : undefined,
-          title: (data as any).title || (data as any).name,
-          location: (data as any).location,
-        };
-      });
-      const eStats = { total: events.length, published: 0, canceled: 0, completed: 0 };
-      for (const e of events) {
-        const s = (e.status || '').toLowerCase();
-        if (s === 'published' || s === 'confirmed') eStats.published++;
-        else if (s === 'cancelled' || s === 'canceled') eStats.canceled++;
-        else if (s === 'completed' || s === 'done') eStats.completed++;
-      }
-
-      // ----- Inquiries -----
-      const inquiriesColl = collection(db, 'inquiries');
-      let inqQuery;
-      if (start && end) {
-        inqQuery = query(
-          inquiriesColl,
-          where('date', '>=', Timestamp.fromDate(start)),
-          where('date', '<=', Timestamp.fromDate(end)),
-          orderBy('date', 'desc')
-        );
-      } else if (start) {
-        inqQuery = query(inquiriesColl, where('date', '>=', Timestamp.fromDate(start)), orderBy('date', 'desc'));
-      } else if (end) {
-        inqQuery = query(inquiriesColl, where('date', '<=', Timestamp.fromDate(end)), orderBy('date', 'desc'));
-      } else {
-        inqQuery = query(inquiriesColl, orderBy('date', 'desc'));
-      }
-      const inqSnap = await getDocs(inqQuery);
-      const inquiries: BaseDoc[] = inqSnap.docs.map((d) => {
-        const data = d.data() as DocumentData;
-        return {
-          id: d.id,
-          date: toDate((data as any).date),
-          status: (data as any).status ? normalizeStatus((data as any).status) : undefined,
-          title: (data as any).title || (data as any).clientName || (data as any).subject,
-        };
-      });
-      const iStats = { Submitted: 0, Accepted: 0, Booked: 0, Completed: 0 } as Record<string, number>;
-      for (const qd of inquiries) {
-        const s = normalizeStatus(qd.status);
-        if (s in iStats) (iStats as any)[s]++;
-      }
-
-      // ----- Availability (flat) -----
-      const availColl = collection(db, 'availability');
-      let availQuery;
-      if (start && end) {
-        availQuery = query(
-          availColl,
-          where('eventStart', '>=', Timestamp.fromDate(start)),
-          where('eventStart', '<=', Timestamp.fromDate(end)),
-          orderBy('eventStart', 'desc')
-        );
-      } else if (start) {
-        availQuery = query(availColl, where('eventStart', '>=', Timestamp.fromDate(start)), orderBy('eventStart', 'desc'));
-      } else if (end) {
-        availQuery = query(availColl, where('eventStart', '<=', Timestamp.fromDate(end)), orderBy('eventStart', 'desc'));
-      } else {
-        availQuery = query(availColl, orderBy('eventStart', 'desc'));
-      }
-      const availSnap = await getDocs(availQuery);
-      const availability: AvailabilityDoc[] = availSnap.docs.map((d) => {
-        const data = d.data() as DocumentData;
-        const raw = (data as any).response ?? (data as any).status;
-        const norm = typeof raw === 'string' ? raw.toLowerCase() : '';
-        const response = norm === 'yes' ? 'Yes' : norm === 'no' ? 'No' : norm === 'maybe' ? 'Maybe' : titleCase((data as any).response);
-        return {
-          id: d.id,
-          uid: (data as any).uid,
-          name: (data as any).displayName || (data as any).name,
-          eventId: (data as any).eventId,
-          date: toDate((data as any).eventStart ?? (data as any).date),
-          response,
-          title: (data as any).eventTitle || (data as any).title,
-        };
-      });
-      const aStats = { total: availability.length, Yes: 0, Maybe: 0, No: 0 };
-      for (const r of availability) {
-        if (r.response === 'Yes') aStats.Yes++;
-        else if (r.response === 'Maybe') aStats.Maybe++;
-        else if (r.response === 'No') aStats.No++;
-      }
-
-      // Apply to state
-      setEventDocs(events);
-      setInquiryDocs(inquiries);
-      setAvailabilityDocs(availability);
-      setEventStats(eStats);
-      setInquiryStats(iStats as any);
-      setAvailabilityStats(aStats);
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message ?? 'Failed to fetch report data');
-      setEventDocs([]);
-      setInquiryDocs([]);
-      setAvailabilityDocs([]);
-      setEventStats({ total: 0, published: 0, canceled: 0, completed: 0 });
-      setInquiryStats({ Submitted: 0, Accepted: 0, Booked: 0, Completed: 0 });
-      setAvailabilityStats({ total: 0, Yes: 0, Maybe: 0, No: 0 });
+      const list = await loadYesAvailability({ onlyFinalized, from: parseDate(from), to: parseDate(to) });
+      const rows = await rowsFromAvailability(list);
+      const map = buildBiweeklyPreview(rows, anchor);
+      setPreview(map);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to build preview');
     } finally {
-      setLoading(false);
-    }
-  }, [startDate, endDate]);
-
-  React.useEffect(() => { fetchCounts(); }, [fetchCounts]);
-
-  // ---------- Drawer actions ----------
-  const openFinalize = async (ev: BaseDoc) => {
-    setSelectedEvent(ev);
-    setDrawerOpen(true);
-    try {
-      const qRef = query(collection(db, 'availability'), where('eventId', '==', ev.id));
-      const snap = await getDocs(qRef);
-      const rows: FinalizeRow[] = snap.docs
-        .map((d) => d.data() as any)
-        .filter((x) => ['yes', 'going', 'attending'].includes(String(x.status ?? x.response).toLowerCase()))
-        .map((x) => ({ uid: x.uid, name: x.displayName || x.name || x.email || x.uid, approved: false }));
-      setFinalizeRows(rows);
-    } catch (e) {
-      console.error(e);
-      setFinalizeRows([]);
+      setBusy('none');
     }
   };
 
-  const toggleApprove = (uid: string) =>
-    setFinalizeRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, approved: !r.approved } : r)));
+  React.useEffect(() => {
+    // auto-build on mount and whenever filters change
+    void rebuildPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlyFinalized, from, to, anchor]);
 
-  const finalizeEvent = async () => {
-    if (!selectedEvent) return;
-    setFinalizing(true);
+  const exportPerformanceBook = async () => {
+    setBusy('perf');
+    setError('');
     try {
-      const hours = hoursBetween(selectedEvent.start, selectedEvent.end);
-      const approved = finalizeRows.filter((r) => r.approved);
-
-      await Promise.all(
-        approved.map((r) => {
-          const payRef = doc(db, 'events', selectedEvent.id, 'payments', r.uid);
-          const payload = {
-            uid: r.uid,
-            name: r.name,
-            eventId: selectedEvent.id,
-            eventTitle: selectedEvent.title || 'Untitled Event',
-            eventDate: toDate(selectedEvent.date) ?? null,
-            hours,
-            approvedAt: serverTimestamp(),
-          };
-          return setDoc(payRef, payload, { merge: true });
-        })
-      );
-
-      await updateDoc(doc(db, 'events', selectedEvent.id), {
-        status: 'completed',
-        completedAt: serverTimestamp(),
-      } as any);
-      await fetchCounts();
-      setDrawerOpen(false);
-      setSelectedEvent(null);
-      setFinalizeRows([]);
-    } catch (e) {
-      console.error('Finalize failed', e);
-      setError('Finalize failed. See console.');
+      const list = await loadYesAvailability({ onlyFinalized, from: parseDate(from), to: parseDate(to) });
+      const rows = await rowsFromAvailability(list);
+      const header = ['Date of Performance', 'Performer Name', 'Dept/Client', 'Event Name', 'Comp Time'];
+      const aoa = [header, ...rows.map((r) => [r.dateISO, r.performer, r.client, r.eventName, r.comp])];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Performance Book');
+      XLSX.writeFile(wb, '2025-2026 Performance Book.xlsx');
+    } catch (e: any) {
+      setError(e?.message || 'Export failed');
     } finally {
-      setFinalizing(false);
+      setBusy('none');
     }
   };
 
-  // ---------- UI ----------
+  const exportBiweekly = async () => {
+    setBusy('biweekly');
+    setError('');
+    try {
+      const list = await loadYesAvailability({ onlyFinalized, from: parseDate(from), to: parseDate(to) });
+      const rows = await rowsFromAvailability(list);
+      const anchorDate = new Date(anchor + 'T00:00:00');
+
+      const buckets = new Map<string, Row[]>();
+      for (const r of rows) {
+        const d = r.dateISO ? new Date(r.dateISO + 'T00:00:00') : null;
+        const key = d ? payKey(d, anchorDate) : 'Unknown Period';
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key)!.push(r);
+      }
+
+      const wb = XLSX.utils.book_new();
+      const keys = Array.from(buckets.keys()).sort();
+      for (const k of keys) {
+        const header = ['Date of Performance', 'Performer Name', 'Dept/Client', 'Event Name', 'Comp Time'];
+        const sheetRows = buckets.get(k)!;
+        const aoa = [[`Pay Period: ${k}`], header, ...sheetRows.map((r) => [r.dateISO, r.performer, r.client, r.eventName, r.comp])];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, k.slice(0, 31));
+      }
+      XLSX.writeFile(wb, '2025-2026 Timesheet Reference.xlsx');
+    } catch (e: any) {
+      setError(e?.message || 'Export failed');
+    } finally {
+      setBusy('none');
+    }
+  };
+
   return (
-    <section className="reports stack">
+    <section className="report-exports">
       <header className="stack">
-        <h1 className="title">Reports</h1>
-        <p className="lede">Tallies for Events, Inquiries, and Availability with simple finalization.</p>
+        <h1 className="ucla-heading-xl">Reports & Exports</h1>
+        <p className="muted">
+          Exports are powered directly by <code>availability</code> responses.
+        </p>
       </header>
 
       <div className="toolbar">
-        <div className="left">
-          <label className="field">
-            <span>From</span>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>To</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </label>
-        </div>
-        <div className="right">
-          <button className="btn" onClick={fetchCounts} disabled={loading}>
-            {loading ? 'Loading…' : 'Refresh'}
-          </button>
-        </div>
+        <label className="field">
+          <span>From</span>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="field">
+          <span>To</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        <label className="field checkbox">
+          <input type="checkbox" checked={onlyFinalized} onChange={(e) => setOnlyFinalized(e.target.checked)} />
+          <span>Only finalized</span>
+        </label>
+        <div className="spacer" />
+        <label className="field">
+          <span>Biweekly Anchor</span>
+          <input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)} />
+        </label>
+        <button className="btn" onClick={rebuildPreview} disabled={busy !== 'none'}>
+          {busy === 'preview' ? 'Refreshing…' : 'Refresh Preview'}
+        </button>
       </div>
 
       {error && <div className="alert">{error}</div>}
 
-      {/* Stat cards stack on mobile */}
-      <StackOnMobile className="grid cols-3 stack-md">
-        <article className="card stat">
-          <h3>Events</h3>
-          <p className="muted">Total (range): {eventStats.total}</p>
-          <div className="pill-row"><span className="badge submitted">Published</span><strong>{eventStats.published}</strong></div>
-          <div className="pill-row"><span className="badge canceled">Canceled</span><strong>{eventStats.canceled}</strong></div>
-          <div className="pill-row"><span className="badge completed">Completed</span><strong>{eventStats.completed}</strong></div>
-        </article>
+      {/* On-screen biweekly preview */}
+      <div className="preview-grid">
+        {Array.from(preview.keys()).sort().map((periodKey) => {
+          const data = preview.get(periodKey)!;
+          const totalsEntries = Object.entries(data.totals).sort((a, b) => a[0].localeCompare(b[0]));
+          return (
+            <section className="period-card" key={periodKey}>
+              <header className="period-head">
+                <h3>Pay Period: {periodKey}</h3>
+                <span className="chip">Total Hours: {Math.round(data.totalHours * 100) / 100}</span>
+              </header>
 
-        <article className="card stat">
-          <h3>Inquiries Funnel</h3>
-          <p className="muted">Total: {Object.values(inquiryStats).reduce((a, b) => a + b, 0)}</p>
-          <div className="pill-row"><span className="badge submitted">Submitted</span><strong>{inquiryStats.Submitted}</strong></div>
-          <div className="pill-row"><span className="badge accepted">Accepted</span><strong>{inquiryStats.Accepted}</strong></div>
-          <div className="pill-row"><span className="badge booked">Booked</span><strong>{inquiryStats.Booked}</strong></div>
-          <div className="pill-row"><span className="badge completed">Completed</span><strong>{inquiryStats.Completed}</strong></div>
-        </article>
-
-        <article className="card stat">
-          <h3>Availability</h3>
-          <p className="muted">Total responses: {availabilityStats.total}</p>
-          <div className="pill-row"><span className="badge yes">Yes</span><strong>{availabilityStats.Yes}</strong></div>
-          <div className="pill-row"><span className="badge maybe">Maybe</span><strong>{availabilityStats.Maybe}</strong></div>
-          <div className="pill-row"><span className="badge no">No</span><strong>{availabilityStats.No}</strong></div>
-        </article>
-      </StackOnMobile>
-
-      {/* Events table with Manage action */}
-      <section className="card stack">
-        <h3>Events in Range</h3>
-        <div className="table table-5">
-          <div className="row head">
-            <div>Date</div><div>Title</div><div>Status</div><div>Duration</div><div>Actions</div>
-          </div>
-          {loading && <div className="row message"><div className="full">Loading…</div></div>}
-          {!loading && eventDocs.length === 0 && <div className="row message"><div className="full">No events.</div></div>}
-          {!loading && eventDocs.map((e) => (
-            <div className="row" key={e.id}>
-              <div>{e.date ? e.date.toLocaleDateString() : '—'}</div>
-              <div>{e.title || '—'}</div>
-              <div><span className={`badge ${String(e.status || 'unknown').toLowerCase()}`}>{e.status || '—'}</span></div>
-              <div>{hoursBetween(e.start, e.end)} hr</div>
-              <div><button className="btn sm" onClick={() => openFinalize(e)} disabled={!e.id}>Manage</button></div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Mixed recent list */}
-      <section className="card stack">
-        <h3>Recent (Events • Inquiries • Availability)</h3>
-        <div className="table">
-          <div className="row head"><div>Date</div><div>Type</div><div>Title</div><div>Status/Response</div></div>
-          {loading && <div className="row message"><div className="full">Loading…</div></div>}
-          {!loading && eventDocs.length + inquiryDocs.length + availabilityDocs.length === 0 && (
-            <div className="row message"><div className="full">No items for selected range.</div></div>
-          )}
-          {!loading && (
-            <>
-              {eventDocs.map((e) => (
-                <div className="row" key={`e-${e.id}`}>
-                  <div>{e.date ? e.date.toLocaleDateString() : '—'}</div>
-                  <div>Event</div>
-                  <div>{e.title || '—'}</div>
-                  <div><span className={`badge ${String(e.status || 'unknown').toLowerCase()}`}>{e.status || '—'}</span></div>
-                </div>
-              ))}
-              {inquiryDocs.map((q) => (
-                <div className="row" key={`q-${q.id}`}>
-                  <div>{q.date ? q.date.toLocaleDateString() : '—'}</div>
-                  <div>Inquiry</div>
-                  <div>{q.title || '—'}</div>
-                  <div><span className={`badge ${String(q.status || 'unknown').toLowerCase()}`}>{q.status || '—'}</span></div>
-                </div>
-              ))}
-              {availabilityDocs.map((r) => (
-                <div className="row" key={`r-${r.id}`}>
-                  <div>{r.date ? r.date.toLocaleDateString() : '—'}</div>
-                  <div>Availability</div>
-                  <div>{r.title || r.eventId || '—'}</div>
-                  <div><span className={`badge ${String(r.response || 'unknown').toLowerCase()}`}>{r.response || '—'}</span></div>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* Drawer container + backdrop + right-side panel */}
-      {drawerOpen && (
-        <div className="rep-drawer-container" aria-hidden={!drawerOpen}>
-          <div className="rep-drawer-backdrop" onClick={() => setDrawerOpen(false)} />
-
-          <div
-            className="rep-drawer-panel"
-            role="dialog"
-            aria-modal={true}
-            aria-label="Finalize Event"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="drawer-head">
-              <div>
-                <div className="drawer-title">Finalize: {selectedEvent?.title ?? '—'}</div>
-                <div className="drawer-meta">
-                  {selectedEvent?.start ? toDate(selectedEvent.start)?.toLocaleString() : '—'}
-                  {selectedEvent?.end ? ` – ${toDate(selectedEvent.end)?.toLocaleTimeString()}` : ''}
-                  {selectedEvent?.location ? ` • ${selectedEvent.location}` : ''}
-                </div>
+              <div className="table-wrap">
+                <table className="reports-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Event</th>
+                      <th>Performer</th>
+                      <th className="num">Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.rows.map((r, i) => (
+                      <tr key={i}>
+                        <td>{r.dateISO || '—'}</td>
+                        <td>{r.eventName || 'Untitled'}</td>
+                        <td>{r.performer}</td>
+                        <td className="num">{typeof r.comp === 'number' ? r.comp : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <button className="drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Close">✕</button>
-            </div>
 
-            <div className="drawer-body">
-              <p className="muted">YES RSVPs — check whom to approve for payment.</p>
-              <div className="table">
-                <div className="row head"><div>Approve</div><div>Performer</div></div>
-                {finalizeRows.length === 0 && (
-                  <div className="row message"><div className="full">No YES RSVPs found.</div></div>
-                )}
-                {finalizeRows.map((r) => (
-                  <div key={r.uid} className="row">
-                    <div><input type="checkbox" checked={r.approved} onChange={() => toggleApprove(r.uid)} aria-label={`Approve ${r.name}`} /></div>
-                    <div>{r.name}</div>
-                  </div>
-                ))}
+              <div className="totals">
+                <h4>Totals by Performer</h4>
+                <table className="reports-table compact">
+                  <thead>
+                    <tr>
+                      <th>Performer</th>
+                      <th className="num">Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {totalsEntries.map(([name, h]) => (
+                      <tr key={name}>
+                        <td>{name}</td>
+                        <td className="num">{Math.round(h * 100) / 100}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="stack">
-                <div className="muted">Duration: {selectedEvent ? hoursBetween(selectedEvent.start, selectedEvent.end) : 0} hr</div>
-                <button className="btn-primary" onClick={finalizeEvent} disabled={finalizing || finalizeRows.every((r) => !r.approved)}>
-                  {finalizing ? 'Finalizing…' : 'Finalize & Write Payments'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </section>
+          );
+        })}
+      </div>
+
+      <div className="actions">
+        <button className="btn" onClick={exportPerformanceBook} disabled={busy !== 'none'}>
+          {busy === 'perf' ? 'Building…' : 'Export Performance Book (.xlsx)'}
+        </button>
+        <button className="btn-primary" onClick={exportBiweekly} disabled={busy !== 'none'}>
+          {busy === 'biweekly' ? 'Building…' : 'Export Biweekly Reference (.xlsx)'}
+        </button>
+      </div>
+
+      <p className="muted">
+        Columns in both exports: <strong>Date of Performance</strong>, <strong>Performer Name</strong>,{' '}
+        <strong>Dept/Client</strong>, <strong>Event Name</strong>, <strong>Comp Time</strong>.
+      </p>
     </section>
   );
 };

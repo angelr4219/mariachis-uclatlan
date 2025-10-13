@@ -1,12 +1,10 @@
-// FILE: src/pages/MembersOnly.tsx (UPDATED)
+// FILE: src/pages/MembersOnly.tsx (UPDATED for Week 3)
 import React from 'react';
 import './MembersOnly.css';
 import { Link } from 'react-router-dom';
 
-
-
-const STATIC_IMAGE = "/dist/UCLATLAN_Fowler_3.png"; 
-const STATIC_CAPTION = "Picture Brandon made"; 
+const STATIC_IMAGE = "/dist/UCLATLAN_Fowler_3.png";
+const STATIC_CAPTION = "Picture Brandon made";
 
 // New: simple caption persisted to localStorage
 const useFunnyCaption = () => {
@@ -33,12 +31,9 @@ const useHalloweenState = () => {
 };
 
 const MembersOnly: React.FC = () => {
-
-  const [url, setUrl] = React.useState('');
-  const [hover, setHover] = React.useState(false);
-  
-
-
+  // hooks kept here in case you want to surface the caption/state later
+  useFunnyCaption();
+  useHalloweenState();
 
   return (
     <section className="members-dashboard ucla-content">
@@ -48,39 +43,41 @@ const MembersOnly: React.FC = () => {
       </header>
 
       <div className="grid">
-        {/* Week 2 Announcement */}
+        {/* Week 3 Announcement */}
         <article className="card announcement">
-          <h2>Hi — welcome back to Week 2!</h2>
+          <h2>Hi — welcome to Week 3!</h2>
           <ul className="nice-list">
             <li><strong>Rehearsal</strong> is at <strong>7:00 PM</strong>.</li>
             <li><strong>Dinner</strong> is at <strong>6:00 PM</strong> (location TBA).</li>
-            <li>Keep an eye on <strong>GroupMe</strong> for last‑minute updates & location pin.</li>
-            <li>Angel — Should we make an Instagram group chat instead of GroupMe? If you think so, please bug Enrique about it.</li>
+            <li>
+              Watch <strong>GroupMe</strong> and our <strong>Instagram chats</strong> for updates on
+              socials, gig calls, and any last‑minute changes.
+            </li>
+            <li>Questions? Ping Enrique or any Board member.</li>
           </ul>
         </article>
 
-        {/* NEW: secondary announcement asking members to ping the Board if they want the IG chat */}
+        {/* Reminder about comms channels */}
         <article className="card announcement">
-          <h2>Community Chat Idea — Tell the Board</h2>
+          <h2>Comms Reminder</h2>
           <p>
-            If you’d prefer an Instagram group chat (or have another platform you like), let the Board know so we can
-            gauge interest. A quick message to Enrique or any Board member is perfect — if enough people want it,
-            we’ll set it up and share the invite link here.
+            We’ll post timely updates in <strong>GroupMe</strong> and the <strong>Instagram chats</strong>.
+            Make sure you’re in both so you don’t miss rehearsal notes, social plans, and call times.
           </p>
         </article>
 
-        {/* Funny picture — now uses your saved image with optional upload/URL */}
+        {/* Funny picture — still static asset */}
         <article className="card funny-picture">
-            <figure className="funny-figure">
+          <figure className="funny-figure">
             <img
-            src={STATIC_IMAGE}
-            alt="Mariachi de Uclatlán — members spotlight"
-            className="funny-image"
-            loading="lazy"
-            decoding="async"
+              src={STATIC_IMAGE}
+              alt="Mariachi de Uclatlán — members spotlight"
+              className="funny-image"
+              loading="lazy"
+              decoding="async"
             />
             <figcaption className="caption">{STATIC_CAPTION}</figcaption>
-            </figure>
+          </figure>
         </article>
       </div>
 
@@ -90,7 +87,7 @@ const MembersOnly: React.FC = () => {
         <ul className="bullets">
           <li>🎺 New: Export your event calendar from <Link to="/members/settings">Settings → Download .ics</Link>.</li>
           <li>📅 Remember to update your availability for upcoming gigs.</li>
-          <li>🧑‍🎓 Welcome new members—check Resources for onboarding!</li>
+          <li>📣 For social updates and quick polls, check GroupMe & Instagram chats.</li>
         </ul>
       </article>
     </section>
