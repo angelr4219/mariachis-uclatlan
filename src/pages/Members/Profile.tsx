@@ -1,388 +1,318 @@
-// =============================================
-// FILE: src/pages/Members/Profile.tsx
-// Description: Member profile page using services/profile.ts + Storage avatar upload
-//              PLUS a list of events this member agreed to (status == "yes"),
-//              matched by their email in the flat `availability` collection.
-// Updates:
-//  - Accepted events now **live update** via Firestore onSnapshot
-//  - Refetch occurs every time you navigate to this page (component mount)
-//  - Keeps prior behavior and styles
-// =============================================
-import React, { useEffect, useMemo, useState } from 'react';
-import './Profile.css';
-import { auth, storage, db } from '../../firebase';
-import { updateProfile as updateAuthProfile } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { UserProfile } from '../../services/profile';
-import { getProfile, upsertProfile } from '../../services/profile';
+// =============================================================
+// FILE: src/pages/Members/ProfilePage.tsx
+// Purpose: Card-first layout + My Inventory + inline RSVP edit + event details modal
+// Notes:
+//  - Reads flat availability by uid (single-field) and filters to status==='yes'
+//  - Clicking a card opens a modal with event details (loaded from {source}/{eventId})
+//  - Change availability for EVENTS directly from profile (writes:
+//      events/{eventId}/availability/{uid}  +  availability/{source_eventId_uid})
+//  - If source!=='events' (e.g., inquiries), RSVP edit is disabled by rules
+// =============================================================
+import React from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '../../firebase';
 import {
   collection,
-  getDocs,
   query,
   where,
-  type CollectionReference,
+  getDocs,
+  getDoc,
+  setDoc,
+  doc,
   Timestamp,
-  onSnapshot,
+  serverTimestamp,
   type DocumentData,
 } from 'firebase/firestore';
-import { useLocation } from 'react-router-dom';
+import './Profile.css';
 
-// ---------- Helpers ----------
-const emptyProfile = (uid: string, email: string | null): UserProfile => ({
-  uid,
-  name: '',
-  email: email || '',
-  phoneNumber: '',
-  year: '',
-  major: '',
-  instrument: '',
-  instruments: [],
-  section: '',
-  bio: '',
-  roles: ['performer'],
-  returning: '',
-  emergencyName: '',
-  emergencyPhone: '',
-  emergencyRelation: '',
-  photoURL: '',
-});
+// ---------- types ----------
+export type FlatAvailability = {
+  id: string; // availability/{id}
+  uid: string;
+  displayName?: string;
+  email?: string | null;
+  status: 'yes' | 'maybe' | 'no';
+  finalized?: boolean;
+  updatedAt?: Timestamp;
+  // denormalized event/meta
+  eventId?: string;
+  eventTitle?: string;
+  eventStart?: Timestamp | Date | string | null;
+  eventEnd?: Timestamp | Date | string | null;
+  eventLocation?: string | null;
+  source?: 'events' | 'inquiries';
+};
 
+export type TrajeItem = {
+  id: string;
+  type: string;
+  size?: string;
+  tag?: string;
+  condition?: string;
+  status?: string;
+  assignedTo?: string | null;
+  assignedAt?: Timestamp;
+  notes?: string;
+};
+
+// ---------- helpers ----------
 const toDate = (v: any): Date | null => {
-  if (!v) return null;
+  if (!v && v !== 0) return null;
   if (v instanceof Date) return v;
-  if (v instanceof Timestamp) return v.toDate();
-  try { const d = new Date(v); return isNaN(d.getTime()) ? null : d; } catch { return null; }
+  if (v && typeof v === 'object' && 'toDate' in v) return (v as Timestamp).toDate();
+  const d = new Date(v); return isNaN(d.getTime()) ? null : d;
 };
 
 const fmtRange = (start: any, end: any): string => {
   const s = toDate(start);
   const e = toDate(end);
   if (!s) return 'TBA';
-  const sStr = s.toLocaleString?.() || s.toISOString();
-  if (!e) return sStr;
-  const same = s.toDateString() === e.toDateString();
-  const eStr = same ? e.toLocaleTimeString?.() : e.toLocaleString?.();
-  return `${sStr} → ${eStr}`;
+  const dateOpts: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+  const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+  if (!e) return `${s.toLocaleDateString(undefined, dateOpts)} ${s.toLocaleTimeString(undefined, timeOpts)}`;
+  const sameDay = s.toDateString() === e.toDateString();
+  const left = `${s.toLocaleDateString(undefined, dateOpts)} ${s.toLocaleTimeString(undefined, timeOpts)}`;
+  const right = sameDay ? e.toLocaleTimeString(undefined, timeOpts) : `${e.toLocaleDateString(undefined, dateOpts)} ${e.toLocaleTimeString(undefined, timeOpts)}`;
+  return `${left} → ${right}`;
 };
 
-// ---------- Types ----------
-interface AcceptedRow {
-  id: string;          // availability doc id (eventId_uid or similar)
-  eventId: string;
-  eventTitle: string;
-  eventStart: Date | null;
-  eventEnd: Date | null;
-  eventLocation?: string | null;
+const fmtWhen = (ts?: Timestamp | Date | string | null): string => {
+  const d = toDate(ts); if (!d) return '';
+  return d.toLocaleString?.() || d.toISOString();
+};
+
+const eventImg = (source?: string) => source === 'inquiries' ? '/img/inquiry-card.jpg' : '/img/event-card.jpg';
+
+// Safe path builder for event RSVP doc
+function availabilityDocRef(source: 'events'|'inquiries', id: string, uid: string) {
+  if (!id || id.includes('/')) throw new Error('bad id');
+  return doc(db, source, id, 'availability', uid);
 }
 
-// =============================================
-// Component
-// =============================================
+// ---------- component ----------
 const Profile: React.FC = () => {
-  const user = auth.currentUser; // route should protect this; may be null at first paint
-  const uid = user?.uid ?? '';
-  const email = user?.email ?? '';
-  const location = useLocation(); // ensures mount effect runs when navigating here
+  const [user] = useAuthState(auth);
+  const [accepted, setAccepted] = React.useState<FlatAvailability[]>([]);
+  const [inventory, setInventory] = React.useState<TrajeItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState<string>('');
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string>('');
-  const [p, setP] = useState<UserProfile | null>(null);
-  const [editMode, setEditMode] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  // modal state
+  const [openId, setOpenId] = React.useState<string | null>(null); // availability doc id (flat)
+  const [openMeta, setOpenMeta] = React.useState<any>(null); // event/inquiry document
+  const current = React.useMemo(() => accepted.find(a => a.id === openId) || null, [accepted, openId]);
 
-  const [banner, setBanner] = useState<null | { type: 'success' | 'error'; text: string }>(null);
-
-  // Events the member said "yes" to (matched by email)
-  const [accepted, setAccepted] = useState<AcceptedRow[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
-
-  // ---------- Load profile (on mount / route enter) ----------
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!uid) { setLoading(false); return; }
-      setLoading(true);
+  React.useEffect(() => {
+    const load = async () => {
+      setErr(''); setLoading(true);
       try {
-        const found = await getProfile(uid);
-        const seed = found ?? emptyProfile(uid, user?.email ?? null);
-        if (alive) setP(seed);
-        if (!found) await upsertProfile(uid, seed); // seed on first visit
+        if (!user) { setLoading(false); return; }
+        // 1) Load availability rows for this user
+        const aRef = collection(db, 'availability');
+        const aSnap = await getDocs(query(aRef, where('uid', '==', user.uid)));
+        const rows: FlatAvailability[] = aSnap.docs.map(d => ({ id: d.id, ...(d.data() as DocumentData) })) as any;
+        const yes = rows.filter(r => r.status === 'yes');
+        yes.sort((a, b) => (toDate(a.eventStart)?.getTime() ?? 0) - (toDate(b.eventStart)?.getTime() ?? 0));
+        setAccepted(yes);
+
+        // 2) Load issued traje items
+        const tRef = collection(db, 'trajes');
+        const tSnap = await getDocs(query(tRef, where('assignedTo', '==', user.uid)));
+        const items: TrajeItem[] = tSnap.docs.map(d => ({ id: d.id, ...(d.data() as DocumentData) })) as any;
+        setInventory(items.filter(it => it.status !== 'retired'));
       } catch (e: any) {
-        console.error('[Profile load]', e);
-        if (alive) setError(e?.message ?? 'Failed to load profile');
+        console.error('[ProfilePage] load failed', e);
+        setErr(e?.message || 'Failed to load profile data');
       } finally {
-        if (alive) setLoading(false);
+        setLoading(false);
       }
-    })();
-    return () => { alive = false; };
-  // include location.key so re-entering the page triggers a fresh load
-  }, [uid, user?.email, location.key]);
+    };
+    void load();
+  }, [user]);
 
-  // ---------- Accepted events (live subscription) ----------
-  useEffect(() => {
-    if (!email) { setAccepted([]); setLoadingEvents(false); return; }
-    setLoadingEvents(true);
-
-    const col = collection(db, 'availability') as CollectionReference;
-    const qRef = query(col, where('email', '==', email), where('status', '==', 'yes'));
-    const unsub = onSnapshot(qRef, (snap) => {
-      const rows: AcceptedRow[] = snap.docs.map((d) => {
-        const data = d.data() as DocumentData;
-        return {
-          id: d.id,
-          eventId: data.eventId,
-          eventTitle: data.eventTitle || 'Untitled Event',
-          eventStart: toDate(data.eventStart),
-          eventEnd: toDate(data.eventEnd),
-          eventLocation: data.eventLocation ?? null,
-        };
-      }).sort((a, b) => (a.eventStart?.getTime() ?? 0) - (b.eventStart?.getTime() ?? 0));
-      setAccepted(rows);
-      setLoadingEvents(false);
-    }, (err) => {
-      console.error('[Accepted events]', err);
-      setAccepted([]);
-      setLoadingEvents(false);
-    });
-
-    return () => unsub();
-  }, [email]);
-
-  // ---------- Handlers ----------
-  const onChange: React.ChangeEventHandler<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> = (e) => {
-    const { name, value } = e.target as HTMLInputElement;
-    setP((prev) => (prev ? { ...prev, [name]: value } : prev));
-  };
-
-  const onPickAvatar: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const file = e.target.files?.[0] || null;
-    setAvatarFile(file);
-    if (file) {
-      const next = URL.createObjectURL(file);
-      setP((prev) => (prev ? { ...prev, photoURL: next } : prev));
-    }
-  };
-
-  const uploadAvatarIfNeeded = async (): Promise<string | undefined> => {
-    if (!avatarFile || !uid) return undefined;
-    const ext = (avatarFile.name.split('.').pop() || 'jpg').toLowerCase();
-    const objectRef = ref(storage, `avatars/${uid}/avatar.${ext}`);
-    await uploadBytes(objectRef, avatarFile);
-    const url = await getDownloadURL(objectRef);
-    return url;
-  };
-
-  const onSave = async () => {
-    if (!p || !uid) return;
-    setSaving(true);
-    setError('');
-    setBanner(null);
+  // Open modal & fetch full event/inquiry doc
+  const openDetails = async (a: FlatAvailability) => {
     try {
-      const avatarURL = await uploadAvatarIfNeeded();
-      const csv = (p as any)._instrumentsCSV as string | undefined;
-      const instruments = csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : (p.instruments || []);
-      const payload: Partial<UserProfile> = { ...p, instruments, ...(avatarURL ? { photoURL: avatarURL } : {}) };
-      await upsertProfile(uid, payload);
-      const displayName = p.name || user?.displayName || undefined;
-      await updateAuthProfile(auth.currentUser!, { displayName, photoURL: avatarURL ?? p.photoURL ?? undefined });
-      setEditMode(false);
-      setP({ ...p, instruments, ...(avatarURL ? { photoURL: avatarURL } : {}) });
-      setBanner({ type: 'success', text: 'Profile saved. Thank you!' });
-    } catch (e: any) {
-      console.error('[Profile save]', e);
-      setError(e?.message ?? 'Failed to save profile');
-      setBanner({ type: 'error', text: 'Something went wrong. Try again or re‑login.' });
-    } finally {
-      setSaving(false);
+      setOpenId(a.id);
+      if (a.source && a.eventId) {
+        const snap = await getDoc(doc(db, a.source, a.eventId));
+        setOpenMeta(snap.exists() ? snap.data() : {});
+      } else {
+        setOpenMeta({});
+      }
+    } catch (e) {
+      console.error('failed to load event details', e);
+      setOpenMeta({});
     }
   };
 
-  // ---------- Render ----------
-  if (loading) return <div className="profile-wrap"><div className="card"><p>Loading profile…</p></div></div>;
-  if (!p) return <div className="profile-wrap"><div className="card"><p>No profile.</p></div></div>;
+  const closeDetails = () => { setOpenId(null); setOpenMeta(null); };
 
-  const roles = p.roles || [];
+  // Save RSVP (events only)
+  const saveRsvp = async (a: FlatAvailability, status: 'yes'|'maybe'|'no') => {
+    if (!user || !a.eventId || a.source !== 'events') return;
+    try {
+      const subRef = availabilityDocRef('events', a.eventId, user.uid);
+      const payload = {
+        uid: user.uid,
+        displayName: user.displayName || user.email || 'Unknown',
+        email: user.email || null,
+        status,
+        updatedAt: serverTimestamp(),
+        source: a.source,
+        refId: a.eventId,
+        eventId: a.eventId,
+        eventTitle: a.eventTitle || (openMeta?.title ?? 'Untitled Event'),
+        eventStart: a.eventStart ?? (openMeta?.start || null),
+        eventEnd: a.eventEnd ?? (openMeta?.end || null),
+        eventLocation: a.eventLocation ?? (openMeta?.location || null),
+        finalized: a.finalized || false,
+      } as const;
+
+      await setDoc(subRef, payload, { merge: true });
+      const flatId = `${a.source}_${a.eventId}_${user.uid}`;
+      await setDoc(doc(db, 'availability', flatId), payload, { merge: true });
+
+      // optimistic local update (and resort list if needed)
+      setAccepted(prev => {
+        const next = prev.map(x => x.id === a.id ? { ...x, status, updatedAt: Timestamp.now() as any } : x);
+        next.sort((p, q) => (toDate(p.eventStart)?.getTime() ?? 0) - (toDate(q.eventStart)?.getTime() ?? 0));
+        return next;
+      });
+    } catch (e) {
+      console.error('saveRsvp failed', e);
+      setErr('Could not save RSVP.');
+    }
+  };
+
+  if (!user) {
+    return (
+      <section className="profile-wrap">
+        <div className="inline-banner error"><span className="banner-icon">!</span><span>Please sign in to view your profile.</span></div>
+      </section>
+    );
+  }
 
   return (
-    <div className="profile-wrap">
-      <div className="card profile-card">
-        {banner && (
-          <div className={`inline-banner ${banner.type}`} role="status" aria-live="polite">
-            <span className="banner-icon" aria-hidden>{banner.type === 'success' ? '✓' : '!'}</span>
-            <span>{banner.text}</span>
-            <button className="banner-dismiss" onClick={() => setBanner(null)} aria-label="Dismiss">×</button>
-          </div>
-        )}
-
-        <div className="profile-head">
-          <div className="avatar">
-            {p.photoURL ? (
-              <img src={p.photoURL} alt={`${p.name || 'Member'} avatar`} />
-            ) : (
-              <div className="avatar-placeholder">{(p.name || p.email || 'U')[0].toUpperCase()}</div>
-            )}
-            {editMode && (
-              <label className="btn btn-light" style={{ marginTop: 8 }}>
-                Upload photo
-                <input type="file" accept="image/*" onChange={onPickAvatar} hidden />
-              </label>
-            )}
-          </div>
-
-          <div className="id-block">
-            {!editMode ? (
-              <>
-                <h2>{p.name || 'Add your name'}</h2>
-                <p className="muted">{p.email}</p>
-                {!!roles.length && (
-                  <div className="roles">
-                    {roles.map((r) => (
-                      <span key={r} className={`role-chip role-${r}`}>{r}</span>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <label className="lbl">Full Name</label>
-                <input name="name" value={p.name || ''} onChange={onChange} placeholder="First Last" />
-              </>
-            )}
-          </div>
-
-          <div className="actions">
-            {!editMode ? (
-              <button className="btn" onClick={() => setEditMode(true)}>Edit</button>
-            ) : (
-              <>
-                <button className="btn" disabled={saving} onClick={onSave}>{saving ? 'Saving…' : 'Save'}</button>
-                <button className="btn btn-light" disabled={saving} onClick={() => setEditMode(false)}>Cancel</button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="grid">
-          <div className="col">
-            <label className="lbl">Phone</label>
-            {!editMode ? (
-              <div className="val">{p.phoneNumber || '—'}</div>
-            ) : (
-              <input name="phoneNumber" value={p.phoneNumber || ''} onChange={onChange} placeholder="+1 (###) ###-####" />
-            )}
-          </div>
-          <div className="col">
-            <label className="lbl">Year</label>
-            {!editMode ? (
-              <div className="val">{p.year || '—'}</div>
-            ) : (
-              <select name="year" value={p.year || ''} onChange={onChange}>
-                <option value="">Select</option>
-                <option>1st Year</option>
-                <option>2nd Year</option>
-                <option>3rd Year</option>
-                <option>4th Year</option>
-                <option>Graduate</option>
-                <option>Alumni</option>
-              </select>
-            )}
-          </div>
-          <div className="col">
-            <label className="lbl">Major</label>
-            {!editMode ? (
-              <div className="val">{p.major || '—'}</div>
-            ) : (
-              <input name="major" value={p.major || ''} onChange={onChange} placeholder="e.g., Math, EE, Music" />
-            )}
-          </div>
-          <div className="col">
-            <label className="lbl">Instrument</label>
-            {!editMode ? (
-              <div className="val">{p.instrument || '—'}</div>
-            ) : (
-              <input name="instrument" value={p.instrument || ''} onChange={onChange} placeholder="e.g., Violin, Trumpet, Vihuela" />
-            )}
-          </div>
-          <div className="col">
-            <label className="lbl">Section</label>
-            {!editMode ? (
-              <div className="val">{p.section || '—'}</div>
-            ) : (
-              <input name="section" value={p.section || ''} onChange={onChange} placeholder="Strings / Brass / Rhythm / Vocals" />
-            )}
-          </div>
-          <div className="col">
-            <label className="lbl">All Instruments</label>
-            {!editMode ? (
-              <div className="val">{(p.instruments && p.instruments.length) ? p.instruments.join(', ') : '—'}</div>
-            ) : (
-              <input name="_instrumentsCSV" value={(p.instruments || []).join(', ')} onChange={onChange} placeholder="Violin, Viola, Trumpet" />
-            )}
-          </div>
-        </div>
-
-        <div className="grid">
-          <div className="col">
-            <label className="lbl">Emergency Contact</label>
-            {!editMode ? (
-              <div className="val">{p.emergencyName || '—'}</div>
-            ) : (
-              <input name="emergencyName" value={p.emergencyName || ''} onChange={onChange} placeholder="Full name" />
-            )}
-          </div>
-          <div className="col">
-            <label className="lbl">Emergency Phone</label>
-            {!editMode ? (
-              <div className="val">{p.emergencyPhone || '—'}</div>
-            ) : (
-              <input name="emergencyPhone" value={p.emergencyPhone || ''} onChange={onChange} placeholder="+1 (###) ###-####" />
-            )}
-          </div>
-          <div className="col">
-            <label className="lbl">Relation</label>
-            {!editMode ? (
-              <div className="val">{p.emergencyRelation || '—'}</div>
-            ) : (
-              <input name="emergencyRelation" value={p.emergencyRelation || ''} onChange={onChange} placeholder="Parent / Sibling / Friend" />
-            )}
-          </div>
-        </div>
-
-        <div className="bio">
-          <label className="lbl">Bio</label>
-          {!editMode ? (
-            <p className="val multi">{p.bio || 'Add a short bio about you, your experience, and favorite pieces to perform.'}</p>
+    <section className="profile-wrap">
+      <header className="card profile-card profile-head">
+        <div className="avatar">
+          {user.photoURL ? (
+            <img src={user.photoURL} alt="avatar" />
           ) : (
-            <textarea name="bio" value={p.bio || ''} onChange={onChange} rows={4} placeholder="Short bio (markdown/plaintext)"></textarea>
+            <div className="avatar-placeholder">{(user.displayName || user.email || 'U')[0].toUpperCase()}</div>
           )}
         </div>
+        <div className="id-block">
+          <h2>{user.displayName || 'Member'}</h2>
+          <div className="muted">{user.email}</div>
+          <div className="roles">
+            <span className="role-chip">Member</span>
+          </div>
+        </div>
+        <div>{/* reserved for future quick-actions */}</div>
+      </header>
 
-        {error && <p className="error">{error}</p>}
-      </div>
+      {err && (
+        <div className="inline-banner error"><span className="banner-icon">!</span><span>{err}</span><button className="banner-dismiss" onClick={()=>setErr('')} aria-label="Dismiss">×</button></div>
+      )}
 
-      {/* Accepted events section (live) */}
-      <h2 className="section-title">Events I’m Playing (Yes)</h2>
-      {loadingEvents && <p className="muted">Loading your events…</p>}
+      {loading && <p className="muted">Loading your events & inventory…</p>}
+
+      {/* ---- Accepted Events (cards) ---- */}
+      <h3 className="section-title">My Accepted Performances</h3>
+      {(!loading && accepted.length === 0) && <p className="muted">No accepted performances yet.</p>}
       <div className="accepted-list">
-        {accepted.map((ev) => (
-          <article className="accepted-card" key={ev.id}>
-            <header className="accepted-head">
-              <h3 className="accepted-title">{ev.eventTitle}</h3>
-            </header>
+        {accepted.map((a) => (
+          <article key={a.id} className="accepted-card" onClick={() => openDetails(a)} role="button" tabIndex={0} onKeyDown={(e)=>{ if(e.key==='Enter') openDetails(a); }}>
+            <div className="accepted-head">
+              <h4 className="accepted-title">{a.eventTitle || 'Untitled'}</h4>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                {a.finalized && <span className="chip chip--final">Finalized</span>}
+                {/* inline RSVP select (events only) */}
+                <select
+                  aria-label="Change availability"
+                  value={a.status}
+                  onClick={(e)=>e.stopPropagation()}
+                  onChange={(e)=>{ e.stopPropagation(); saveRsvp(a, e.target.value as any); }}
+                  disabled={a.finalized || a.source !== 'events'}
+                >
+                  <option value="yes">Yes</option>
+                  <option value="maybe">Maybe</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+            </div>
+            <img
+              src={eventImg(a.source)}
+              alt="event visual"
+              className="card-img"
+              onError={(e)=>{(e.currentTarget as HTMLImageElement).style.display='none';}}
+            />
             <dl className="accepted-meta">
-              <div className="meta-row"><dt>When</dt><dd>{fmtRange(ev.eventStart, ev.eventEnd)}</dd></div>
-              {ev.eventLocation && (
-                <div className="meta-row"><dt>Where</dt><dd>{ev.eventLocation}</dd></div>
-              )}
+              <div className="meta-row"><dt>When</dt><dd>{fmtRange(a.eventStart, a.eventEnd)}</dd></div>
+              {!!a.eventLocation && <div className="meta-row"><dt>Where</dt><dd>{a.eventLocation}</dd></div>}
+              {!!a.updatedAt && <div className="meta-row"><dt>Updated</dt><dd>{fmtWhen(a.updatedAt)}</dd></div>}
             </dl>
           </article>
         ))}
-        {!loadingEvents && !accepted.length && (
-          <p className="muted">No accepted events yet. Head to Performer Availability to RSVP.</p>
-        )}
       </div>
-    </div>
+
+      {/* ---- Inventory ---- */}
+      <h3 className="section-title" style={{ marginTop: '1.25rem' }}>My Issued Traje Items</h3>
+      {(!loading && inventory.length === 0) && <p className="muted">You currently have no issued items.</p>}
+      <div className="accepted-list">
+        {inventory.map((it) => (
+          <article key={it.id} className="accepted-card">
+            <div className="accepted-head">
+              <h4 className="accepted-title">{it.type || 'Item'}</h4>
+              <span className="chip">{it.status || 'assigned'}</span>
+            </div>
+            <dl className="accepted-meta">
+              {it.tag && <div className="meta-row"><dt>Tag</dt><dd>{it.tag}</dd></div>}
+              {it.size && <div className="meta-row"><dt>Size</dt><dd>{it.size}</dd></div>}
+              {it.condition && <div className="meta-row"><dt>Cond.</dt><dd>{it.condition}</dd></div>}
+              {it.assignedAt && <div className="meta-row"><dt>Since</dt><dd>{fmtWhen(it.assignedAt)}</dd></div>}
+              {it.notes && <div className="meta-row"><dt>Notes</dt><dd>{it.notes}</dd></div>}
+            </dl>
+          </article>
+        ))}
+      </div>
+
+      {/* ---- Modal: Event Details ---- */}
+      {current && (
+        <div className="modal-backdrop" onClick={closeDetails}>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="Event details" onClick={(e)=>e.stopPropagation()}>
+            <header className="modal-head">
+              <h4 className="modal-title">{current.eventTitle || 'Event'}</h4>
+              <button className="modal-close" onClick={closeDetails} aria-label="Close">×</button>
+            </header>
+            <div className="modal-body">
+              <p className="muted">{current.source === 'events' ? 'Event' : 'Inquiry'} • {fmtRange(current.eventStart, current.eventEnd)}</p>
+              {current.eventLocation && <p><strong>Location:</strong> {current.eventLocation}</p>}
+              {openMeta?.description && <p className="multi">{openMeta.description}</p>}
+              {!openMeta?.description && <p className="muted">No description provided.</p>}
+
+              <div style={{ marginTop: 12 }}>
+                <label className="field"><span>My Availability</span>
+                  <select
+                    value={current.status}
+                    onChange={(e)=>saveRsvp(current, e.target.value as any)}
+                    disabled={current.finalized || current.source !== 'events'}
+                  >
+                    <option value="yes">Yes</option>
+                    <option value="maybe">Maybe</option>
+                    <option value="no">No</option>
+                  </select>
+                </label>
+                {current.finalized && <div className="inline-banner error" style={{marginTop:8}}>This RSVP was finalized by an admin.</div>}
+                {current.source !== 'events' && <div className="inline-banner error" style={{marginTop:8}}>Availability can only be submitted on confirmed events.</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
   );
 };
 

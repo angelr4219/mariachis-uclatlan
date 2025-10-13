@@ -1,0 +1,22 @@
+/* ------------------------------ CSS (next file) ------------------------------ */
+/* src/pages/MembersResources.css */
+:root { --bruins-blue:#2774AE; --ucla-gold:#FFD100; }
+
+.resources-shell { padding: 2rem 1rem; }
+.resources-header { display:flex; flex-direction:column; gap:.5rem; margin-bottom:1rem; }
+.resources-header .lede { color:#6b7280; }
+
+.resources-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:16px; }
+@media (max-width: 900px){ .resources-grid{ grid-template-columns: 1fr; } }
+
+.card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; background:#fff; }
+.res-card { display:flex; flex-direction:column; gap:.75rem; }
+.res-title { color: var(--ucla-gold); margin:0; }
+.res-desc { margin:0; color:#374151; }
+
+.btn { display:inline-block; padding:10px 14px; border-radius:8px; font-weight:700; text-decoration:none; }
+.btn-primary { background: var(--bruins-blue); color:#fff; }
+.btn.insta { background:#000; color:#fff; }
+.btn.groupme { background:#00AAE5; color:#fff; }
+
+.resources-foot { margin-top:12px; }

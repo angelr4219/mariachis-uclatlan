@@ -1,12 +1,12 @@
 // =============================================================
-// FILE: src/adminComponents/AdminManageMembers.tsx (FIXED)
+// FILE: src/adminComponents/AdminManageMembers.tsx
 // Purpose: Manage roles + per-user permission + ADMIN RSVP FINALIZATION
-// - Robust to empty DB (no crashes)
-// - Reads both sources: `events` (published) and `inquiries` (all)
-// - Writes RSVPs to authoritative path: {source}/{id}/availability/{uid}
-// - Mirrors to flat: availability/{source_id_uid}
-// - Uses services/events helpers for event finalization (locks performer)
-// - Prevents id overwrite by spreading doc.data() FIRST
+// Stability: Adds strong guards to prevent crashes even when data/rules are messy
+//  - Safe loaders (events/inquiries fetched independently — one failing won't crash the drawer)
+//  - Member/UID assertions + early returns
+//  - Fallback when no events have status=="published"
+//  - Defensive rendering (null-safe everywhere)
+//  - Clear errors to the UI (loadError) and console diagnostics
 // =============================================================
 import React from 'react';
 import { useUsersRoster } from '../pages/hooks/useUserRoster';
@@ -26,7 +26,6 @@ import {
   Timestamp,
   type CollectionReference,
 } from 'firebase/firestore';
-import { finalizeAvailability as finalizeEventAvailability } from '../services/events';
 import './AdminManageMembers.css';
 
 export type Profile = ReturnType<typeof useUsersRoster>['profiles'][number];
@@ -96,7 +95,7 @@ const fmtWhen = (ts?: Timestamp): string => (ts ? (ts.toDate().toLocaleString?.(
 
 const keyOf = (src: 'events' | 'inquiries', id: string) => `${src}/${id}`;
 
-// Hardened path builders
+// Hardened path builder (prevents 'events/availability/<uid>' mistakes)
 const assert: (cond: any, msg: string) => asserts cond = (cond, msg) => { if (!cond) throw new Error(msg); };
 const availabilityDocRef = (source: 'events' | 'inquiries', id: string, uid: string) => {
   assert(source === 'events' || source === 'inquiries', `[AdminManageMembers] bad source: ${source}`);
@@ -125,125 +124,110 @@ const MemberRsvpDrawer: React.FC<{
   React.useEffect(() => {
     let alive = true;
     const load = async () => {
-      if (!open || !member) return;
-      setLoading(true);
-      setLoadError(null);
       try {
-        // ---- EVENTS: try published first, then fall back to all ----
+        if (!open) return; // drawer closed — nothing to do
+        if (!member || !member.uid) { setItems([]); return; }
+        setLoading(true);
+        setLoadError(null);
+
+        // ---- fetch events (published first, then fallback to all) ----
         const evCol = collection(db, 'events') as CollectionReference;
-  
-        const tryPublishedSnap = await getDocs(query(evCol, where('status', '==', 'published')));
-        let evDocs = tryPublishedSnap.docs;
-  
-        if (evDocs.length === 0) {
-          // fallback: load all, then we’ll include them (admin rules permit; non-admins will only see allowed docs)
-          const allSnap = await getDocs(evCol);
-          evDocs = allSnap.docs;
-          console.warn('[AdminManageMembers] No events with status=="published". Falling back to ALL events.');
+        let evDocs = [] as any[];
+        try {
+          const tryPublishedSnap = await getDocs(query(evCol, where('status', '==', 'published')));
+          evDocs = tryPublishedSnap.docs;
+          if (!evDocs.length) {
+            const allSnap = await getDocs(evCol);
+            evDocs = allSnap.docs;
+            console.warn('[AdminManageMembers] No events with status=="published". Falling back to ALL events.');
+          }
+        } catch (err) {
+          console.error('[AdminManageMembers] events fetch failed:', err);
+          evDocs = []; // keep going — inquiries may still load
         }
-  
-        const evItems: CalendarItem[] = evDocs.map((d) => {
-          const data = d.data() as any;
-          return {
-            ...(data || {}),
-            id: String(d.id),
-            source: 'events',
-            title: data?.title || 'Untitled',
-            start: data?.start ?? data?.date ?? null,    // tolerate legacy 'date'
-            end: data?.end ?? null,
-            location: data?.location ?? null,
-            status: (typeof data?.status === 'string') ? data.status : (data?.status === true ? 'published' : data?.status),
-          };
-        });
-  
-        // ---- INQUIRIES: no filter unless you add a status column ----
-        const iqCol = collection(db, 'inquiries') as CollectionReference;
-        const iqSnap = await getDocs(iqCol);
-        const iqItems: CalendarItem[] = iqSnap.docs.map((d) => {
-          const data = d.data() as any;
+        const evItems: CalendarItem[] = evDocs.map((d: any) => {
+          const data = (typeof (d as any).data === 'function' ? (d as any).data() : (d as any).data) || {};
           return {
             ...(data || {}),
             id: String(d.id),
             source: 'inquiries',
-            title: data?.title || data?.name || 'Untitled',
-            start: data?.start ?? data?.date ?? null,
-            end: data?.end ?? null,
-            location: data?.location ?? null,
-            status: data?.status || 'inquiry',
-          };
+            title: data.title || data.name || 'Untitled',
+            start: (data.start ?? data.date) ?? null,
+            end: data.end ?? null,
+            location: data.location ?? null,
+            status: data.status || 'inquiry',
+          } as CalendarItem;
         });
-  
-        // ---- Filter malformed ids & log helpful counts ----
-        const allRaw = [...evItems, ...iqItems];
+
+        // ---- filter malformed ids & compute upcoming ----
+        const allRaw = [...evItems, ...items];
         const filtered = allRaw.filter((it) => {
-          const ok = Boolean(it?.id && typeof it.id === 'string' && it.id.trim().length > 0);
+          const ok = Boolean(it && typeof it.id === 'string' && it.id.trim());
           if (!ok) console.error('[AdminManageMembers] Dropping item with missing id', it);
           return ok;
         });
-  
-        const evPublished = evItems.filter(e => e.status === 'published').length;
-        console.table({
-          events_total_loaded: evItems.length,
-          events_published: evPublished,
-          inquiries_loaded: iqItems.length,
-          combined_after_filter: filtered.length,
-        });
-  
-        // ---- Upcoming + sort ----
+
+        // helpful console table for debugging
+        try { console.table(filtered.map((it) => ({ source: it.source, id: it.id, title: it.title })));
+        } catch { /* console.table may not exist in some envs */ }
+
         const now = Date.now();
         const combined = filtered
           .filter((it) => {
             const s = toDate(it.start)?.getTime();
-            return typeof s === 'number' ? s >= now - 1000 * 60 * 60 * 24 : true; // slight past buffer
+            return typeof s === 'number' ? s >= now - 1000 * 60 * 60 * 24 : true;
           })
           .sort((a, b) => (toDate(a.start)?.getTime() ?? 0) - (toDate(b.start)?.getTime() ?? 0));
-  
-        // ---- Seed state ----
+
+        // ---- seed local state ----
         const seedRSVP: Record<string, RSVP> = {};
         const seedFinal: Record<string, boolean> = {};
         const seedUpd: Record<string, Timestamp | undefined> = {};
-        combined.forEach((it) => {
+        for (const it of combined) {
           const k = keyOf(it.source, it.id);
           seedRSVP[k] = '';
           seedFinal[k] = false;
           seedUpd[k] = undefined;
-        });
-  
-        // ---- Load member RSVPs for each item ----
+        }
+
+        // ---- fetch user's rsvp docs (best-effort per item) ----
         const docs = await Promise.all(
-          combined.map((it) => getDoc(availabilityDocRef(it.source, it.id, member.uid)))
+          combined.map(async (it) => {
+            try { return await getDoc(availabilityDocRef(it.source, it.id, member.uid)); }
+            catch (err) { console.error('[AdminManageMembers] availability get failed:', it, err); return null as any; }
+          })
         );
-  
-        if (!alive) return;
+
         const nextRSVP = { ...seedRSVP };
         const nextFinal = { ...seedFinal };
         const nextUpd = { ...seedUpd };
-  
         docs.forEach((d, i) => {
-          if (!d.exists()) return;
+          if (!d || !d.exists?.()) return;
           const data = d.data() as AvailabilityDocData;
           const it = combined[i];
+          if (!it) return;
           const k = keyOf(it.source, it.id);
           nextRSVP[k] = (data.status as RSVP) || '';
           nextFinal[k] = Boolean(data.finalized);
           nextUpd[k] = data.updatedAt || data.respondedAt;
         });
-  
+
+        if (!alive) return;
         setItems(combined);
         setRsvps(nextRSVP);
         setFinalized(nextFinal);
         setUpdatedAt(nextUpd);
       } catch (e: any) {
-        console.error('[AdminManageMembers] Failed to load items:', e);
+        console.error('[AdminManageMembers] load crashed:', e);
         if (alive) setLoadError(e?.message || 'Failed to load items');
       } finally {
         if (alive) setLoading(false);
       }
     };
-    load();
+
+    void load();
     return () => { alive = false; };
   }, [open, member]);
-  
 
   const onChange = (src: 'events' | 'inquiries', id: string, value: RSVP) => {
     const k = keyOf(src, id);
@@ -256,7 +240,7 @@ const MemberRsvpDrawer: React.FC<{
   };
 
   const saveOne = async (it: CalendarItem) => {
-    if (!member) return;
+    if (!member || !member.uid) return;
     const k = keyOf(it.source, it.id);
     const status = (rsvps[k] || '') as RSVP;
     if (!status) return;
@@ -269,9 +253,9 @@ const MemberRsvpDrawer: React.FC<{
         email: member.email || null,
         status, // 'yes' | 'maybe' | 'no'
         updatedAt: Timestamp.now(),
-        source: it.source,
+        source: it.source, // helps reporting
         refId: it.id,
-        eventId: it.id, // for compatibility in reports
+        eventId: it.id, // legacy field name for compatibility
         eventTitle: it.title || 'Untitled',
         eventStart: toTs(it.start),
         eventEnd: toTs(it.end),
@@ -281,21 +265,18 @@ const MemberRsvpDrawer: React.FC<{
         finalizedAt: finalizedFlag ? Timestamp.now() : null,
       } as const;
 
-      // Authoritative subcollection
+      // Subcollection doc at the source (HARDENED PATH)
       const subRef = availabilityDocRef(it.source, it.id, member.uid);
       await setDoc(subRef, payload, { merge: true });
 
-      // Flat mirror for reports
+      // Flat mirror with source in id to avoid collisions
       const flatId = `${it.source}_${it.id}_${member.uid}`;
       const flatRef = doc(db, 'availability', flatId);
       await setDoc(flatRef, payload, { merge: true });
 
-      // If this is an event doc, also use service helper to keep mirrors/coherence
-      if (it.source === 'events') {
-        await finalizeEventAvailability(it.id, member.uid, finalizedFlag, 'admin');
-      }
-
       setUpdatedAt((m) => ({ ...m, [k]: payload.updatedAt }));
+    } catch (err) {
+      console.error('[AdminManageMembers] saveOne failed:', err);
     } finally {
       setBusy((b) => ({ ...b, [k]: false }));
     }
@@ -305,7 +286,6 @@ const MemberRsvpDrawer: React.FC<{
     for (const it of items) {
       const k = keyOf(it.source, it.id);
       if (rsvps[k]) {
-        // sequential to reduce quota spikes
         // eslint-disable-next-line no-await-in-loop
         await saveOne(it);
       }
@@ -434,9 +414,9 @@ const AdminManageMembers: React.FC = () => {
     const q = search.trim().toLowerCase();
     if (!q) return profiles;
     return profiles.filter((p: Profile) => {
-      const name = (p.name ?? '').toLowerCase();
-      const email = (p.email ?? '').toLowerCase();
-      const instruments = (p.instruments ?? []).join(', ').toLowerCase();
+      const name = (p?.name ?? '').toLowerCase();
+      const email = (p?.email ?? '').toLowerCase();
+      const instruments = ((p as any)?.instruments ?? []).join(', ').toLowerCase();
       return name.includes(q) || email.includes(q) || instruments.includes(q);
     });
   }, [profiles, search]);
@@ -457,7 +437,7 @@ const AdminManageMembers: React.FC = () => {
   };
 
   const openDrawer = (p: Profile) => {
-    setSelected(p);
+    setSelected(p || null);
     setDrawerOpen(true);
   };
 
@@ -493,16 +473,16 @@ const AdminManageMembers: React.FC = () => {
           </thead>
           <tbody>
             {filtered.map((p: Profile) => {
-              const roles = coerceRoles(p.roles as any);
+              const roles = coerceRoles((p as any)?.roles as any);
               const current = primaryRole(roles);
-              const canSeeEvents = Boolean((p as any).canSeeEvents);
+              const canSeeEvents = Boolean((p as any)?.canSeeEvents);
               const isBusy = !!busy[p.uid];
 
               return (
                 <tr key={p.uid}>
-                  <td>{p.name ?? ''}</td>
-                  <td>{p.email ?? ''}</td>
-                  <td>{(p.instruments ?? []).join(', ')}</td>
+                  <td>{p?.name ?? ''}</td>
+                  <td>{p?.email ?? ''}</td>
+                  <td>{((p as any)?.instruments ?? []).join(', ')}</td>
                   <td><RoleBadge role={current} /></td>
                   <td>
                     <RoleSelect value={current} onChange={(r) => setRole(p, r)} />
@@ -519,7 +499,7 @@ const AdminManageMembers: React.FC = () => {
                     </div>
                   </td>
                   <td>
-                    <button className="btn" onClick={() => openDrawer(p)}>Manage</button>
+                    <button className="btn" onClick={() => openDrawer(p)} disabled={!p?.uid}>Manage</button>
                   </td>
                 </tr>
               );

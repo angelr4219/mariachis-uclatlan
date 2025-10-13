@@ -1,6 +1,9 @@
-
 // =============================================
-// FILE: src/pages/public/HireUs.tsx (updated)
+// FILE: src/pages/public/HireUs.tsx  (UPDATED)
+// Purpose: Single public entry — always writes to `inquiries` for admin review
+// - Keeps your reCAPTCHA + Apps Script email via submitClientRequest
+// - Ensures Firestore write lands in `inquiries` with status 'new'
+// - Defensive ISO building and UX polish
 // =============================================
 import React, { useState } from 'react';
 import { useRecaptcha } from './hooks/useRecaptcha';
@@ -15,42 +18,52 @@ export default function HireUs() {
   });
   const [ok, setOk] = useState<string>('');
   const [err, setErr] = useState<string>('');
+  const [busy, setBusy] = useState<boolean>(false);
   const { execute } = useRecaptcha();
+
+  const isoOrUndefined = (date: string, time: string) => {
+    if (!date) return undefined;
+    const t = time && time.length >= 4 ? time : '00:00';
+    try { return new Date(`${date}T${t}:00`).toISOString(); } catch { return undefined; }
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setOk(''); setErr('');
-    try {
-      const token = await execute('client_booking');
-      const startIso = form.date && form.startTime ? new Date(`${form.date}T${form.startTime}`).toISOString() : undefined;
-      const endIso = form.date && form.endTime ? new Date(`${form.date}T${form.endTime}`).toISOString() : undefined;
+    if (busy) return;
+    setOk(''); setErr(''); setBusy(true);
 
-      // Build a single payload we can reuse for both Apps Script + Firestore
+    try {
+      if (!form.name.trim() || !form.email.trim()) {
+        setErr('Please provide your name and email.');
+        setBusy(false);
+        return;
+      }
+
+      const token = await execute('client_booking');
+
       const basePayload = {
-        name: form.name,
-        email: form.email,
-        phone: form.phone || undefined,
-        org: form.org || undefined,
-        message: form.details || undefined,
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim() || undefined,
+        org: form.org.trim() || undefined,
+        message: form.details.trim() || undefined,
         event: {
-          title: form.title || 'Client Inquiry',
+          title: (form.title || 'Client Inquiry').trim(),
           date: form.date || undefined,
-          start: startIso,
-          end: endIso,
-          location: form.location || undefined,
+          start: isoOrUndefined(form.date, form.startTime),
+          end: isoOrUndefined(form.date, form.endTime),
+          location: form.location.trim() || undefined,
         },
         meta: {
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
           tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }
+        },
       } as const;
 
-      // Kick off both the email/Apps Script call and the Firestore write
+      // 1) Email/notify (Apps Script or your backend)
+      // 2) Persist to Firestore `inquiries` for admin review (status: 'new')
       await Promise.all([
-        submitClientRequest({
-          recaptchaToken: token,
-          ...basePayload,
-        } as any),
+        submitClientRequest({ recaptchaToken: token, ...basePayload } as any),
         createInquiry(basePayload),
       ]);
 
@@ -59,6 +72,8 @@ export default function HireUs() {
     } catch (e: any) {
       console.error('[HireUs submit] ', e);
       setErr(e?.message || 'Failed to send');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -73,7 +88,7 @@ export default function HireUs() {
         <input placeholder="Organization (optional)" value={form.org} onChange={e=>setForm(f=>({...f,org:e.target.value}))} />
 
         <h3>Event</h3>
-        <input placeholder="Event title" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} required />
+        <input placeholder="Event title" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} />
         <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
         <div className="time-row">
           <input type="time" value={form.startTime} onChange={e=>setForm(f=>({...f,startTime:e.target.value}))} />
@@ -82,10 +97,12 @@ export default function HireUs() {
         <input placeholder="Location" value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} />
         <textarea placeholder="Details / repertoire / special notes" value={form.details} onChange={e=>setForm(f=>({...f,details:e.target.value}))} />
 
-        <button type="submit">Submit request</button>
-        {ok && <p className="ok">{ok}</p>}
-        {err && <p className="err">{err}</p>}
+        <button type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit request'}</button>
+        {ok && <p className="ok" role="status">{ok}</p>}
+        {err && <p className="err" role="alert">{err}</p>}
       </form>
     </div>
   );
 }
+
+

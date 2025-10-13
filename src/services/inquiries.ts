@@ -1,42 +1,39 @@
 // =============================================
-// FILE: src/services/inquiries.ts
-// Desc: Firestore create function for public Hire Us inquiries
+// FILE: src/pages/services/inquiries.ts  (NEW or UPDATE existing)
+// Purpose: normalized creator that always writes to `inquiries` with admin-review defaults
 // =============================================
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export type InquiryPayload = {
+export type PublicInquiryPayload = {
   name: string;
   email: string;
   phone?: string;
   org?: string;
   message?: string;
-  event?: {
-    title?: string;
-    date?: string;     // YYYY-MM-DD
-    start?: string;    // ISO
-    end?: string;      // ISO
-    location?: string;
-  };
-  meta?: Record<string, unknown>; // extensible
+  event?: { title?: string; date?: string; start?: string; end?: string; location?: string };
+  meta?: { userAgent?: string; tz?: string };
 };
 
-export async function createInquiry(payload: InquiryPayload) {
-  // Normalize: ensure at least a name/email
-  if (!payload?.name || !payload?.email) {
-    throw new Error('Missing name or email in inquiry');
-  }
-
-  const docData = {
-    ...payload,
-    status: 'new' as const,          // 'new' | 'in_progress' | 'closed'
-    source: 'public_form' as const,  // trace where it came from
+export async function createInquiry(p: PublicInquiryPayload) {
+  const payload = {
+    name: p.name,
+    email: p.email,
+    phone: p.phone ?? null,
+    org: p.org ?? null,
+    message: p.message ?? null,
+    event: {
+      title: p.event?.title ?? null,
+      date: p.event?.date ?? null,
+      start: p.event?.start ?? null,
+      end: p.event?.end ?? null,
+      location: p.event?.location ?? null,
+    },
+    status: 'new',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  };
+    meta: { userAgent: p.meta?.userAgent ?? null, tz: p.meta?.tz ?? null },
+  } as const;
 
-  const ref = await addDoc(collection(db, 'inquiries'), docData);
-  return ref.id; // return new doc id for UI debugging if needed
+  await addDoc(collection(db, 'inquiries'), payload);
 }
-
-
