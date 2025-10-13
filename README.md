@@ -1,108 +1,119 @@
-Mariachi de Uclatlán Website 🎶
+# Mariachi de Uclatlán Website 🎶
 
-This is the official web platform for Mariachi de Uclatlán, UCLA’s premier mariachi ensemble.
-The site provides public pages (About, Contact, Booking), a members portal, performer dashboards, and an admin dashboard — all powered by React + Vite + Firebase.
+Official web platform for **Mariachi de Uclatlán**, UCLA’s premier mariachi ensemble. Built with **React + Vite + Firebase** and designed for three audiences: the public, members/performers, and admins.
 
-🚀 Features
+---
 
-Public Pages
+## 🚀 Features (current)
 
-Home, About, Contact, Book Us, Join
+### Public
 
-Authentication
+* **Home, About, Contact**
+* **Book Us** (performance inquiry entry point)
+* **Join** (interest / onboarding page)
 
-Email + Password
+### Authentication
 
-Google Sign-In
+* **Email & Password**
+* **Google Sign‑In**
+* **Phone (SMS) + reCAPTCHA**
 
-Phone (SMS + reCAPTCHA)
+### Members Portal (`/members/*`)
 
-Members Portal
+* **Members landing (Dashboard-lite)**
+* **Profile** (Firestore-backed user profile)
+* **Events** (list + details)
+* **Calendar** (read-only calendar view)
+* **Performer Availability** (Yes/No/Maybe)
+* **Resources** (links to sheet music library via Box)
+* **Settings**
 
-Profile, Events, Resources, Settings
+### Role‑Based Dashboards
 
-Performer availability tracking
+* **Performer Dashboard** (role = performer)
+* **Admin Dashboard** (role = admin)
+* Automatic selection via a **role‑based layout** wrapper; separate navbars for Member / Performer / Admin views.
 
-Calendar & event management
+### Firestore Integration
 
-Role-Based Dashboards
+* **User registration profile** created on sign‑up
+* **Events & availability** synced in real time
+* **Optional custom claims** support for role detection
 
-Performer Dashboard
+---
 
-Admin Dashboard
+## 🧩 Tech Stack
 
-Role detection via Firebase Auth & custom claims
+* **Frontend:** React + TypeScript (Vite)
+* **Auth:** Firebase Authentication (Email/Google/Phone)
+* **DB:** Cloud Firestore (real-time)
+* **Storage (optional):** Firebase Storage for avatars/media
 
-Firestore Integration
+---
 
-User registration profiles stored in Firestore
+## 📂 Project Structure (current)
 
-Events, availability, and member data synced in real time
-
-📂 Project Structure
+```
 src/
-│
-├── App.tsx                # Main app router & role-based navbars
-├── firebase.ts            # Firebase config & initialization
-│
-├── pages/                 # Public + Member + Admin pages
-│   ├── Home.tsx
-│   ├── About.tsx
-│   ├── Contact.tsx
-│   ├── Login.tsx
-│   ├── Register.tsx
-│   ├── bookUs.tsx
-│   ├── joinUs.tsx
-│   ├── MembersOnly.tsx
-│   └── Members/           # Members section
-│       ├── Profile.tsx
-│       ├── Events.tsx
-│       ├── Resources.tsx
-│       ├── Settings.tsx
-│       ├── PerformerAvailability.tsx
-│       └── Calendar.tsx
-│
-├── components/            # Shared UI components
-│   ├── Navbar.tsx
-│   ├── Footer.tsx
-│   ├── MembersNavbar.tsx
-│   └── carousel/
-│
-├── adminComponents/       # Admin-only UI
-│   └── adminDashboard.tsx
-│
-├── performerComponents/   # Performer-only UI
-│   └── PerformerDashboard.tsx
-│
-└── rolebasedlayout/       # Role-based routing logic
-    └── rbl.tsx
+├─ App.tsx                     # Router & top-level nav switching
+├─ firebase.ts                 # Firebase config/init
+├─ components/
+│  ├─ Navbar.tsx
+│  ├─ Footer.tsx
+│  ├─ MembersNavbar.tsx
+│  └─ carousel/
+├─ adminComponents/
+│  ├─ adminDashboard.tsx
+│  └─ adminNavbar.tsx
+├─ performerComponents/
+│  ├─ PerformerDashboard.tsx
+│  └─ performerNavbar.tsx
+├─ rolebasedlayout/
+│  └─ rbl.tsx                  # Role-based layout (admin/performer/public)
+├─ pages/
+│  ├─ Home.tsx
+│  ├─ About.tsx
+│  ├─ Contact.tsx
+│  ├─ Login.tsx
+│  ├─ Register.tsx
+│  ├─ bookUs.tsx
+│  ├─ joinUs.tsx
+│  ├─ MembersOnly.tsx
+│  ├─ ManageMembers.tsx        # (internal management surface)
+│  └─ Members/
+│     ├─ Profile.tsx
+│     ├─ Events.tsx
+│     ├─ Resources.tsx
+│     ├─ Settings.tsx
+│     ├─ PerformerAvailability.tsx
+│     └─ Calendar.tsx
+└─ styles/                     # (if using standalone CSS files)
+```
 
-⚙️ Setup & Installation
+> **Note:** Routes for `/admin-dashboard`, `/performer-dashboard`, and `/members/*` are mounted in `App.tsx`. Navbars switch automatically based on the current section and auth state.
 
-Clone the repo
+---
 
-git clone https://github.com/<your-org>/<your-repo>.git
-cd <your-repo>
+## ⚙️ Setup & Installation
 
+1. **Clone & install**
 
-Install dependencies
-
+```bash
+git clone https://github.com/<your-org-or-user>/<repo>.git
+cd <repo>
 npm install
+```
 
+2. **Create Firebase project** (Console)
 
-Configure Firebase
+* Enable **Authentication** (Email/Password, Google, and Phone).
+* Enable **Firestore**.
+* (Optional) Enable **Storage** for avatars.
 
-Create a Firebase project at Firebase Console
-.
+3. **Local env vars**
+   Create `.env` at the repo root:
 
-Enable Authentication (Email/Password, Google, Phone).
-
-Enable Firestore Database.
-
-Add your web app and copy its config.
-
-Create a .env file in the root with:
-
+```bash
 VITE_API_KEY=your_api_key
 VITE_AUTH_DOMAIN=your_project.firebaseapp.com
 VITE_PROJECT_ID=your_project_id
@@ -110,44 +121,75 @@ VITE_STORAGE_BUCKET=your_project.appspot.com
 VITE_MESSAGING_SENDER_ID=your_sender_id
 VITE_APP_ID=your_app_id
 VITE_MEASUREMENT_ID=your_measurement_id
+```
 
+4. **Run dev server**
 
-Run the dev server
-
+```bash
 npm run dev
+```
 
+App runs at **[http://localhost:5173](http://localhost:5173)**.
 
-App runs at http://localhost:5173
-.
+5. **Build & preview**
 
-Build for production
-
+```bash
 npm run build
 npm run preview
+```
 
-👥 Roles
+---
 
-Public – Anyone visiting the site.
+## 👥 Roles & Access
 
-Performer – Authenticated member with performer role.
+* **Public** – anyone visiting the site
+* **Performer** – authenticated users with performer role
+* **Admin** – elevated privileges
 
-Admin – Admin users with elevated privileges.
+Role detection can be handled via **Firebase custom claims** or a **roles field in Firestore**. The role‑based layout chooses which dashboard to render and which navbar to show.
 
-Roles are determined by email → role mapping in
-src/config/roles.ts.
+---
 
-🛠 Scripts
+## 🔒 Security Notes (high level)
 
-npm run dev – Start development server
+* Authenticated users can **read & write their own profile**.
+* Sensitive collections (e.g., **admin‑only**) should be restricted to **admin role**.
+* Always test Firestore rules with the Firebase Emulator or Rules Playground before deploying.
 
-npm run build – Build production app
+---
 
-npm run preview – Preview production build locally
+## 🛠 Scripts
 
-npm run lint – Run linter
+```bash
+npm run dev       # start dev server
+npm run build     # production build
+npm run preview   # serve dist/ locally for QA
+```
 
-📌 Notes
+(If you add linting/formatting, also expose `npm run lint` / `npm run format`.)
 
-Make sure your Firebase rules are set up to allow authenticated users to read/write their own data while restricting sensitive collections to admins.
+---
 
-Admin and Performer dashboards will only appear if the user is signed in with the correct role.
+## 📌 Current State & To‑Dos
+
+* ✅ Email/Google/Phone login flows wired up
+* ✅ Members area with Profile / Events / Calendar / Availability / Resources / Settings
+* ✅ Separate navbars for Members, Performer, Admin contexts
+* ✅ Role‑based dashboard selection
+* ✅ Resources page links to **Box sheet‑music library** (update link in code/config as needed)
+* ⏳ **Performance Inquiry workflow**: currently routed via **Book Us**; plan to queue submissions into an **Admin Performance Requests** collection for review before promotion to Events
+* ⏳ **Single “Member Portal” top‑nav** (optional) that routes to `/members` and surfaces Login/Redirect if not signed in
+
+---
+
+## 🤝 Contributing
+
+1. Branch from `main` (`feat/...` or `fix/...`)
+2. Keep PRs focused with a short description and testing notes
+3. Include screenshots or a short video for UI changes
+
+---
+
+## 🧭 Contact
+
+For questions or performance bookings, use the **Contact** or **Book Us** pages. Internal issues: open a GitHub issue or contact the web team.
