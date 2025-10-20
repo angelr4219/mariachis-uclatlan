@@ -1,17 +1,14 @@
-// ===============================
-// 1) TYPES — src/types/events.ts
-// ===============================# Calendar + RSVP + Sheet Sync + Client Booking (React + Vite + Firebase)
 
-// src/types/events.ts
-// Types for Events with Firestore Timestamp storage and Date-based UI model
-// src/types/events.ts
-// Types for Events with Firestore Timestamp storage and Date-based UI model
 
+// =============================================
+// PATCH 2 — src/types/events.ts (align RSVPStatus used by availability/roster)
+// If your app elsewhere expects 'yes' | 'maybe' | 'no', keep that here to prevent type/runtime mismatches.
+// =============================================
 import type { Timestamp } from 'firebase/firestore';
 import type { RoleNeed } from './rsvp';
 export type { RoleNeed } from './rsvp';
 
-export type EventStatus = 'draft' | 'published' | 'cancelled';
+export type EventStatus = 'draft' | 'published' | 'cancelled' | 'internal' | 'requested';
 
 export interface ClientInfo {
   name?: string;
@@ -21,66 +18,46 @@ export interface ClientInfo {
   notes?: string;
 }
 
-// Firestore document shape (as stored)
 export interface EventDoc {
-  id: string; // convenience when mapping
+  id: string;
   title: string;
-  start: Timestamp; // Firestore Timestamp
-  end?: Timestamp; // optional
+  start: Timestamp | null;
+  end?: Timestamp | null;
   location: string;
   description?: string;
   status: EventStatus;
-
-  // Extended fields already used elsewhere in the app
-  rolesNeeded: RoleNeed[]; // what parts we need
-  assignedUids?: string[]; // optional: seed who is assigned
-  client?: ClientInfo | null; // client payload from the inquiry form
-
-  createdBy: string; // uid or email
-  createdAt: number; // Date.now()
-  updatedAt: number; // Date.now()
-  publishedAt?: number; // Date.now() when status becomes 'published'
+  rolesNeeded?: RoleNeed[];
+  assignedUids?: string[];
+  client?: ClientInfo | null;
+  createdBy?: string;
+  createdAt?: number | Timestamp;
+  updatedAt?: number | Timestamp;
+  publishedAt?: number | Timestamp;
 }
 
-// Normalized for app usage (Dates for UI logic)
 export interface EventItem {
   id: string;
   title: string;
-  start: Date;
-  end?: Date;
+  start: Date | null;
+  end?: Date | null;
   location: string;
   description?: string;
   status: EventStatus;
-
-  rolesNeeded: RoleNeed[];
+  rolesNeeded?: RoleNeed[];
   assignedUids?: string[];
   client?: ClientInfo | null;
-
-  createdBy: string;
-  createdAt: number;
-  updatedAt: number;
-  publishedAt?: number;
+  createdBy?: string;
+  createdAt?: number | Date;
+  updatedAt?: number | Date;
+  publishedAt?: number | Date;
 }
 
-// Optional: View model for presentational cards
-export interface EventCardVM {
-  id: string;
-  title: string;
-  date: string; // e.g., "Sep 2, 2025"
-  time: string; // e.g., "3:00 PM – 5:00 PM"
-  location: string;
-  description: string;
-  status: EventStatus;
-}
-
-export type RSVPStatus = 'accepted' | 'declined' | 'tentative' | 'none';
-
-
+export type RSVPStatus = 'yes' | 'maybe' | 'no' | 'unanswered';
 
 export interface RSVPDoc {
-uid: string;
-displayName?: string | null;
-role?: string | null;
-status: RSVPStatus; // 'accepted' | 'declined' | 'maybe'
-updatedAt?: any; // Firestore Timestamp (or number if you store ms)
+  uid: string;
+  displayName?: string | null;
+  role?: string | null;
+  status: RSVPStatus;
+  updatedAt?: any; // Firestore Timestamp (or number)
 }

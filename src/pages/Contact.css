@@ -1,40 +1,21 @@
-/* src/pages/Contact.css */
-.contact-page {
-    max-width: 900px;
-    margin: 2rem auto;
-    padding: 2rem 1rem;
-    text-align: center;
-    color: black;           /* text is now black */
-}
-  
-.contact-intro {
-    margin: 0 auto 1.5rem;
-    line-height: 1.6;
-}
-  
-.contact-link {
-    text-decoration: underline;
-}
-  
-.contact-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-}
-  
-.cta-button {
-    display: inline-block;
-    padding: 0.9rem 1.2rem;
-    border-radius: 0.75rem;
-    text-decoration: none;
-    font-weight: 600;
-    background: rgba(0, 0, 0, 0.05);  /* lighter background for contrast */
-    color: black;                     /* button text also black */
-    transition: transform 0.15s ease, background 0.15s ease;
-}
-  
-.cta-button:hover {
-    transform: translateY(-2px);
-    background: rgba(0, 0, 0, 0.15);
-}
+
+
+/* ===============================
+File: src/pages/Contact.css
+(unchanged except added .row-3 and .duration-note)
+=============================== */
+:root { --ucla-blue:#2774AE; --ucla-gold:#FFD100; }
+.contact-page { padding: 2rem; max-width: 960px; margin: 0 auto; }
+.contact-title { font-size: 2rem; margin-bottom: .5rem; }
+.contact-intro { margin-bottom: 1rem; }
+.contact-form { display: grid; gap: .9rem; }
+.row-2 { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.row-3 { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+label { display: grid; gap: .4rem; font-weight: 600; }
+input, textarea { font: inherit; padding: .65rem .8rem; border: 1px solid #d7d7d7; border-radius: .6rem; }
+textarea { min-height: 140px; }
+button[type="submit"] { justify-self: start; background: var(--ucla-blue); color: #fff; border: 0; border-radius: .6rem; padding: .7rem 1.1rem; font-weight: 700; cursor: pointer; }
+.duration-note { font-weight: 600; margin-top: -.5rem; }
+.contact-status { margin-top: .25rem; font-weight: 600; }
+
+

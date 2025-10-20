@@ -171,7 +171,7 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute user={user} isAdminUser={isAdminUser} requiresAdmin>
                 <>
-                  <AdminNavbar />
+                  
                   <AdminLayout />
                 </>
               </ProtectedRoute>

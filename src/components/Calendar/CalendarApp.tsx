@@ -1,6 +1,6 @@
 // =============================================
-// FILE: src/components/Calendar/CalendarApp.tsx (UPDATED)
-// Right-side drawer (like Reports) + availability badges + live subscriptions
+// FILE: src/components/Calendar/CalendarApp.tsx
+// Right-side drawer + availability badges + live subscriptions
 // =============================================
 import React from 'react';
 import './CalendarApp.css';
@@ -10,7 +10,11 @@ import type { EventItem } from '../../types/events';
 export type ParticipantInfo = {
   uid: string;
   name?: string;
-  status?: 'going' | 'maybe' | 'declined' | 'unknown';
+  // Your hooks may use multiple vocabularies; we'll normalize them
+  status?:
+    | 'going' | 'maybe' | 'declined' | 'unknown'
+    | 'yes' | 'no'
+    | 'accepted' | 'tentative';
   section?: string; // instrument/section (optional)
 };
 
@@ -83,8 +87,8 @@ function keyOf(d: Date) {
 function groupEventsByDay(events: EventItem[], expandMultiDay: boolean): Map<string, EventItem[]> {
   const map = new Map<string, EventItem[]>();
   for (const ev of events) {
-    const start = new Date(ev.start.getFullYear(), ev.start.getMonth(), ev.start.getDate());
-    const lastDate = ev.end && ev.end > ev.start
+    const start = ev.start ? new Date(ev.start.getFullYear(), ev.start.getMonth(), ev.start.getDate()) : new Date();
+    const lastDate = ev.end && ev.start && ev.end > ev.start
       ? new Date(ev.end.getFullYear(), ev.end.getMonth(), ev.end.getDate())
       : start;
 
@@ -116,15 +120,27 @@ function canViewerSee(ev: EventItem, role: 'guest'|'member'|'admin') {
   return true;
 }
 
-// Summarize attendees to Yes/Maybe/No
+// ---- Availability summary (normalize multiple vocabularies) ----
 type AvSummary = { yes: number; maybe: number; no: number };
+
+// Normalize status into yes/maybe/no
+function toYNM(s?: ParticipantInfo['status']): 'yes'|'maybe'|'no'|'unknown' {
+  if (!s) return 'unknown';
+  const k = String(s).toLowerCase();
+  if (k === 'yes' || k === 'going' || k === 'accepted') return 'yes';
+  if (k === 'maybe' || k === 'tentative') return 'maybe';
+  if (k === 'no' || k === 'declined') return 'no';
+  return 'unknown';
+}
+
 const summarize = (list: ParticipantInfo[] | null | undefined): AvSummary => {
   const res: AvSummary = { yes: 0, maybe: 0, no: 0 };
   if (!list) return res;
   for (const p of list) {
-    if (p.status === 'going') res.yes++;
-    else if (p.status === 'maybe') res.maybe++;
-    else if (p.status === 'declined') res.no++;
+    const st = toYNM(p.status);
+    if (st === 'yes') res.yes++;
+    else if (st === 'maybe') res.maybe++;
+    else if (st === 'no') res.no++;
   }
   return res;
 };
@@ -182,7 +198,7 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
 
   const visibleEvents = React.useMemo(() => {
     return (filterByAudience ? events.filter(e => canViewerSee(e, viewerRole)) : events)
-      .sort((a, b) => +a.start - +b.start);
+      .sort((a, b) => (a.start && b.start ? +a.start - +b.start : 0));
   }, [events, viewerRole, filterByAudience]);
 
   const cells = React.useMemo(() => buildGrid(cursor, firstDayOfWeek), [cursor, firstDayOfWeek]);
@@ -193,7 +209,7 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
   const agendaGroups = React.useMemo(() => {
     const map = new Map<string, EventItem[]>();
     for (const it of visibleEvents) {
-      const key = keyOf(it.start);
+      const key = it.start ? keyOf(it.start) : '';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(it);
     }
@@ -245,7 +261,6 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
 
   const openEventDrawer = async (ev: EventItem) => {
     onEventClick?.(ev);
-    // Always open drawer (like Reports). If attendees disabled, we still show event details.
     setSelectedEvent(ev);
     setDrawerOpen(true);
 
@@ -362,7 +377,7 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
                 {list.map((ev) => (
                   <li key={ev.id} className="agenda-item">
                     <span className="agenda-time">
-                      {ev.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {ev.start ? ev.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                       {ev.end ? ` – ${ev.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
                     </span>
                     <div className="agenda-pill-wrap">
@@ -401,7 +416,7 @@ const CalendarApp: React.FC<CalendarAppProps> = ({
               <div>
                 <div className="drawer-title">{selectedEvent.title}</div>
                 <div className="drawer-meta">
-                  {selectedEvent.start.toLocaleString()}
+                  {selectedEvent.start ? selectedEvent.start.toLocaleString() : 'N/A'}
                   {selectedEvent.end ? ` – ${selectedEvent.end.toLocaleTimeString()}` : ''}
                   {(selectedEvent as any).location ? ` • ${(selectedEvent as any).location}` : ''}
                 </div>
@@ -448,21 +463,25 @@ const AttendeeTabs: React.FC<{ list: ParticipantInfo[] }> = ({ list }) => {
   const [tab, setTab] = React.useState<'going'|'maybe'|'declined'|'all'>('going');
 
   const buckets = React.useMemo(() => {
-    const g = list.filter(p => p.status === 'going');
-    const m = list.filter(p => p.status === 'maybe');
-    const d = list.filter(p => p.status === 'declined');
+    const g = list.filter(p => toYNM(p.status) === 'yes');
+    const m = list.filter(p => toYNM(p.status) === 'maybe');
+    const d = list.filter(p => toYNM(p.status) === 'no');
     return { g, m, d };
   }, [list]);
 
   const renderRow = (p: ParticipantInfo) => (
     <tr key={p.uid}>
       <td>{p.name ?? p.uid}</td>
-      <td className={`status ${p.status ?? 'unknown'}`}>{p.status ?? 'unknown'}</td>
+      <td className={`status ${toYNM(p.status)}`}>{toYNM(p.status)}</td>
       <td>{p.section ?? '—'}</td>
     </tr>
   );
 
-  const current = tab === 'all' ? list : tab === 'going' ? buckets.g : tab === 'maybe' ? buckets.m : buckets.d;
+  const current =
+    tab === 'all' ? list
+      : tab === 'going' ? buckets.g
+      : tab === 'maybe' ? buckets.m
+      : buckets.d;
 
   return (
     <div className="att-wrap">

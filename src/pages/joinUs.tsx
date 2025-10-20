@@ -1,41 +1,62 @@
-import { useState } from 'react';
-import './FormPages.css';
+
+
+// --- src/pages/joinUs.tsx ---
+import React, { useState } from 'react';
+import { sanitizeMessage, isValidPhoneE164, cleanPhone } from '../services/sanitize';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import '../pages/Joinus.css';
 
 const Join: React.FC = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    instrument: '',
-    experience: ''
-  });
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [instrument, setInstrument] = useState('');
+  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Join request submitted:', formData);
-    alert('Thank you for your interest! We will contact you soon.');
+    setStatus(null);
+
+    const phoneClean = cleanPhone(phone);
+    if (phone && !isValidPhoneE164(phoneClean)) {
+      setStatus('Please enter a valid phone number in +1########## format.');
+      return;
+    }
+
+    try {
+      const payload = {
+        name: name.trim().slice(0, 200),
+        email: email.trim().toLowerCase(),
+        phone: phoneClean,
+        instrument: instrument.trim().slice(0, 100),
+        message: sanitizeMessage(message, 2000),
+        createdAt: serverTimestamp(),
+        kind: 'joinRequest',
+      };
+      await addDoc(collection(db, 'joinRequests'), payload);
+      setStatus('Thanks! We will reach out soon.');
+      setName(''); setEmail(''); setPhone(''); setInstrument(''); setMessage('');
+    } catch (err: any) {
+      console.error('[join.submit] ', err);
+      setStatus(err?.message ?? 'Sorry, something went wrong submitting your request.');
+    }
   };
 
   return (
-    <section className="form-page">
+    <section className="bj-page">
       <h1>Join Mariachi de Uclatlán</h1>
-      <p>Interested in joining our group? Fill out the form below.</p>
-
-      <form onSubmit={handleSubmit}>
-        <input name="name" placeholder="Your Name" onChange={handleChange} required />
-        <input name="email" type="email" placeholder="Your Email" onChange={handleChange} required />
-        <input name="phone" placeholder="Phone Number" onChange={handleChange} required />
-        <input name="instrument" placeholder="Instrument" onChange={handleChange} required />
-        <textarea name="experience" placeholder="Tell us about your experience..." onChange={handleChange} required />
-
-        <button type="submit">Submit Application</button>
+      <form className="bj-form" onSubmit={submit}>
+        <label>Name<input value={name} onChange={(e) => setName(e.target.value)} required /></label>
+        <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+        <label>Phone (optional)<input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+13105551234" /></label>
+        <label>Instrument<input value={instrument} onChange={(e) => setInstrument(e.target.value)} required /></label>
+        <label>Message<textarea value={message} onChange={(e) => setMessage(e.target.value)} /></label>
+        <button type="submit">Submit</button>
+        {status && <p className="bj-status">{status}</p>}
       </form>
     </section>
   );
 };
-
 export default Join;

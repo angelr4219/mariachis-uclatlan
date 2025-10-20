@@ -1,41 +1,46 @@
 // =============================================
-// FILE: src/pages/Members/MemberEvents.tsx
-// Purpose: Member-facing view-only list mapped to EventCard.EventType (dateStr required)
+// FILE: src/pages/Members/MemberEvents.tsx  (REPLACEMENT)
+// Purpose: Member-facing events list using EventCard.EventType
+// Notes:
+//  - Replaces the older src/pages/Members/Events.tsx
+//  - Maps wider EventStatus to EventCard's narrow status set
 // =============================================
 import React from 'react';
 import EventCard, { type EventType as EventCardType } from '../../components/events/EventCard';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, subscribeUpcomingEvents } from '../../services/events';
+import { subscribeUpcomingEvents } from '../../services/events';
 import type { EventItem } from '../../types/events';
 import { formatDateRange } from '../../utils/events';
 
-// Map Firestore EventItem -> EventCardType expected by <EventCard/>
+function mapToCardStatus(s: EventItem['status']): EventCardType['status'] {
+  switch (s) {
+    case 'published': return 'published';
+    case 'cancelled': return 'cancelled';
+    default: return 'draft'; // draft | internal | requested → draft
+  }
+}
+
 function toEventCardType(vm: EventItem): EventCardType {
   const { date, time } = formatDateRange(vm);
   return {
     id: vm.id,
     title: vm.title,
-    dateStr: time ? `${date}, ${time}` : date, // <-- EventCard expects dateStr
+    dateStr: time ? `${date}, ${time}` : date,
     location: vm.location || '',
     notes: vm.description || '',
-    status: vm.status,
+    status: mapToCardStatus(vm.status),
   };
 }
 
 const MemberEvents: React.FC = () => {
-  const [me, setMe] = React.useState<any>(null);
   const [events, setEvents] = React.useState<EventCardType[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => setMe(u));
-
     const unsub = subscribeUpcomingEvents(['published'], (list: EventItem[]) => {
       setEvents(list.map(toEventCardType));
       setLoading(false);
     });
-
-    return () => { unsub(); unsubAuth(); };
+    return () => unsub();
   }, []);
 
   return (
@@ -46,7 +51,7 @@ const MemberEvents: React.FC = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
         {events.map((ev) => (
-          <EventCard key={ev.id} event={ev} /* view-only: canManage=false, canRSVP=false */ />
+          <EventCard key={ev.id} event={ev} />
         ))}
       </div>
     </section>

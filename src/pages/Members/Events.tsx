@@ -14,7 +14,7 @@ function toEventCardType(vm: EventItem): EventCardType {
     dateStr: time ? `${date}, ${time}` : date,
     location: vm.location || '',
     notes: vm.description || '',
-    status: vm.status,
+    status: (vm.status === 'draft' || vm.status === 'published' || vm.status === 'cancelled') ? vm.status : undefined,
   };
 }
 

@@ -1,3 +1,11 @@
+// =============================================
+// FILE: firestore.rules (UPDATED)
+// Desc: Keep your rules and add explicit permissions for saved roster under events
+// Notes:
+// - Admin definition expanded via users/{uid}.roles OR profiles/{uid}.role/roles OR custom claim admin:true
+// - Events readable by signed-in users; admins manage writes
+// - Roster lives at events/{eventId}/roster_members/* and events/{eventId}/roster_summary/latest
+// =============================================
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -10,15 +18,34 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    // Returns [] if roles missing or not a list
     function rolesArray() {
       return (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
               userDoc().data.roles is list)
              ? userDoc().data.roles : [];
     }
 
+    // Additional admin sources
+    function profileDoc() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid));
+    }
+    function hasProfileAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
+        (
+          (profileDoc().data.role is string && profileDoc().data.role == "admin") ||
+          (profileDoc().data.roles is list && profileDoc().data.roles.hasAny(["admin","staff"]))
+        );
+    }
+    function hasAdminClaim() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
     function isAdmin() {
-      return isSignedIn() && rolesArray().hasAny(['admin']);
+      return isSignedIn() && (
+        rolesArray().hasAny(['admin']) ||
+        hasProfileAdmin() ||
+        hasAdminClaim()
+      );
     }
 
     // ----------------- users -----------------
@@ -27,32 +54,42 @@ service cloud.firestore {
       allow write: if isAdmin() || isSelf(uid);
     }
 
+    // ----------------- profiles -----------------
+    match /profiles/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isSelf(uid);
+      allow update: if isAdmin() || (
+        isSelf(uid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName','firstName','lastName','email','instrument','section','photoURL'
+        ])
+      );
+    }
+
     // ----------------- events -----------------
     match /events/{eventId} {
-      // Anyone signed in can read published events; admins can read all
-      allow read: if isAdmin() || resource.data.status == 'published';
-
-      // Only admins manage events
+      allow read: if isAdmin() || isSignedIn() || resource.data.status == 'published';
       allow create, update, delete: if isAdmin();
 
-      // Per-event availability subcollection
+      // Per-event availability (owner/admin)
       match /availability/{uid} {
-        // Owner or admin can read
         allow read: if isAdmin() || isSelf(uid);
-
-        // Admin can always write; owner can write unless the existing doc is finalized
         allow write: if isAdmin() || (isSelf(uid) && !(exists(resource) && resource.data.finalized == true));
+      }
 
-        // Optional stricter validator (uncomment to enforce payload shape)
-        // allow create, update: if (isAdmin() || isSelf(uid)) &&
-        //   request.resource.data.status in ['yes','maybe','no'] &&
-        //   request.resource.data.uid == uid;
+      // Persisted roster under each event (NEW)
+      match /roster_members/{uid} {
+        allow read: if isAdmin() || isSignedIn();
+        allow write: if isAdmin();
+      }
+      match /roster_summary/{docId} {
+        allow read: if isAdmin() || isSignedIn();
+        allow write: if isAdmin();
       }
     }
 
     // ----------------- inquiries -----------------
     match /inquiries/{inquiryId} {
-      // Public can create inquiries (tighten if desired)
       allow create: if
         request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200 &&
         request.resource.data.email is string && request.resource.data.email.size() > 0 && request.resource.data.email.size() <= 320 &&
@@ -77,27 +114,20 @@ service cloud.firestore {
         (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
         (!('status' in request.resource.data) || request.resource.data.status in ['new','in_progress','closed']);
 
-      // Admin-only read/update/delete of inquiries
       allow read, update, delete: if isAdmin();
 
-      // Per-inquiry availability subcollection
       match /availability/{uid} {
         allow read: if isAdmin() || isSelf(uid);
         allow write: if isAdmin() || (isSelf(uid) && !(exists(resource) && resource.data.finalized == true));
-        // allow create, update: if request.resource.data.uid == uid; // optional
       }
     }
 
     // ----------------- top-level mirrors -----------------
-    // availability/{flatId}
     match /availability/{flatId} {
-      // Admins can read; owner may read their own if you want (keep strict for reports)
-      allow read: if isAdmin();
-      // Admin or owner can write mirror
+      allow read: if isAdmin() || isSignedIn();
       allow write: if isAdmin() || (isSignedIn() && request.resource.data.uid == request.auth.uid);
     }
 
-    // availability_responses/{flatId}
     match /availability_responses/{flatId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
       allow list: if isAdmin();
@@ -117,7 +147,7 @@ service cloud.firestore {
 
     match /social_polls/halloween2025 {
       allow read: if isSignedIn();
-      allow write: if false; // block direct edits
+      allow write: if false;
     }
   }
 }

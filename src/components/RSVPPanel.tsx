@@ -1,11 +1,13 @@
+
+
 // =============================================
-// FILE: src/components/RSVPPanel.tsx
+// FILE: src/components/RSVPPanel.tsx  (PATCH)
+// Purpose: Align types with src/types/events (RSVPStatus = 'yes'|'maybe'|'no'|'unanswered')
 // =============================================
 import React, { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
-import type { RSVPDoc } from '../types/rsvp';
-import type { EventItem, RSVPStatus } from '../types/events';
+import type { RSVPDoc, RSVPStatus, EventItem } from '../types/events';
 import { getMyRSVP, setRSVP } from '../services/events';
 import RSVPButtons from './RSVPButtons';
 import './RSVPPanel.css';
@@ -27,7 +29,7 @@ export default function RSVPPanel({ event }: { event: EventItem }) {
       setUid(u.uid);
       setLoading(true);
       const r = await getMyRSVP(event.id, u.uid);
-      setMine(r);
+      setMine(r as RSVPDoc | null);
       setLoading(false);
     });
     return () => unsub();
@@ -37,7 +39,7 @@ export default function RSVPPanel({ event }: { event: EventItem }) {
     if (!uid) return;
     const r: RSVPDoc = {
       uid,
-      role: mine?.role ?? undefined, // ✅ use undefined instead of null
+      role: mine?.role ?? undefined,
       status: next,
       updatedAt: Date.now(),
     };
@@ -53,3 +55,4 @@ export default function RSVPPanel({ event }: { event: EventItem }) {
     </div>
   );
 }
+
